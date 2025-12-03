@@ -131,7 +131,6 @@ describe('Media API with Fetch', () => {
 
         // Delete
         const result = await api.deleteMedia(uploaded.id);
-        console.log('Delete result:', result);
         expect(result.message).toContain('deleted successfully');
 
         // Verify deletion

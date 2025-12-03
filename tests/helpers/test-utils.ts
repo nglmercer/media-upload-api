@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { mediaRouter } from '../../src/routers/media'
-import { mediaStorage } from '../../src/store/mediaStore'
+
 import { createConfigFile } from '../../src/config'
 import path from 'path'
 import { mkdir, rm } from 'fs/promises'
@@ -13,34 +13,35 @@ export async function createTestApp(): Promise<{ app: Hono; testStorage: any; or
   const testStorage = new DataStorage(
     new JSONFileAdapter(testMediaPath)
   )
-  
+
   // Override global mediaStorage temporarily
+  const { mediaStorage } = await import('../../src/store/mediaStore')
   const originalStorage = mediaStorage
-  
+
   const app = new Hono()
   app.route('/api/media', mediaRouter)
   app.get('/api/media/data', async (c) => {
     const data = await testStorage.getAll()
     return c.json(data)
   })
-  
+
   return { app, testStorage, originalStorage }
 }
 
 export async function setupTestEnvironment(): Promise<void> {
   // Clean up everything first
   await cleanupTestEnvironment()
-  
+
   // Setup config
   createConfigFile()
-  
+
   // Create necessary directories
   const testDirs = [
-    'uploads', 
-    'uploads/images', 
-    'uploads/videos', 
-    'uploads/audios', 
-    'uploads/subtitles', 
+    'uploads',
+    'uploads/images',
+    'uploads/videos',
+    'uploads/audios',
+    'uploads/subtitles',
     'media'
   ]
   for (const dir of testDirs) {
@@ -57,7 +58,7 @@ export async function cleanupTestEnvironment(): Promise<void> {
       // Ignore if directory doesn't exist
     }
   }
-  
+
   // Clean up config file
   try {
     await rm(path.join(process.cwd(), 'config.json'), { force: true })
@@ -77,20 +78,20 @@ export function createMockFile(type: string, name?: string): File {
     'text/vtt': new Uint8Array([87, 69, 66, 86, 84, 84]), // WEBVTT header
     'application/x-subrip': new Uint8Array([49]), // SRT header
   }
-  
+
   const mimeType = mockData[type as keyof typeof mockData] || new Uint8Array([1, 2, 3])
   const fileName = name || `test.${type.split('/')[1]}`
-  
+
   return new File([mimeType], fileName, { type })
 }
 
 export async function createFormDataWithFile(file: File, metadata?: Record<string, any>): Promise<FormData> {
   const formData = new FormData()
   formData.append('file', file)
-  
+
   if (metadata) {
     formData.append('metadata', JSON.stringify(metadata))
   }
-  
+
   return formData
 }

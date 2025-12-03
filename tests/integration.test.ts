@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
 import path from 'path'
 import { mkdir, writeFile, rm } from 'fs/promises'
+import { Hono } from 'hono'
 
 const TEST_MEDIA_FILE = path.join(process.cwd(), "media/media_integration.json");
 const TEST_UPLOADS_DIR = path.join(process.cwd(), "uploads_integration");
@@ -17,7 +18,7 @@ mock.module("../src/config", () => ({
 }));
 
 // Dynamic imports
-const { Hono } = await import('hono');
+
 const { mediaRouter } = await import('../src/routers/media');
 const MediaStoreModule = await import('../src/store/mediaStore');
 const { createConfigFile, loadConfig } = await import('../src/config');

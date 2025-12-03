@@ -149,12 +149,10 @@ mediaRouter.post("/upload/:type", async (c) => {
 mediaRouter.delete('/:id', async (c) => {
   const params = c.req.param()
   const id = params.id
-  console.log(`[MediaRouter] Deleting media: ${id}`)
 
   try {
     const media = await mediaStorage.load(id)
     if (!media) {
-      console.log(`[MediaRouter] Media not found: ${id}`)
       return c.json({ error: 'Media not found' }, 404)
     }
 
@@ -164,60 +162,22 @@ mediaRouter.delete('/:id', async (c) => {
         ? config.uploadsDir
         : path.join(process.cwd(), config.uploadsDir)
 
-      // media.url is like /uploads/images/file.png
-      // We need to map it to the configured uploadsDir
-      // But media.url starts with /uploads/
-      // If uploadsDir is "uploads_fetch", we need to replace /uploads/ with uploads_fetch path?
-      // NO! media.url is relative to the web root.
-      // But we are deleting from DISK.
-
-      // The current implementation assumes media.url is relative to CWD if we join with process.cwd().
-      // But we changed uploadsDir!
-
-      // If media.url is "/uploads/images/file.png"
-      // And uploadsDir is "uploads_fetch" (absolute path)
-      // We need to construct the file path correctly.
-
-      // The upload logic constructs url as `/uploads/${getDirectoryForType(type)}/${fileName}`.
-      // This is hardcoded "/uploads/".
-
-      // If we use a custom uploadsDir, we should probably store the relative path from uploadsDir?
-      // Or we need to know how to map URL to File Path.
-
-      // Current implementation in DELETE:
-      // const filePath = path.join(process.cwd(), media.url)
-
-      // This assumes media.url matches the file system structure relative to CWD.
-      // If uploadsDir is "uploads_fetch", then file is at "uploads_fetch/images/file.png".
-      // But media.url is "/uploads/images/file.png".
-      // So path.join(cwd, "/uploads/images/...") -> "C:\...\uploads\images\..."
-      // But the file is at "C:\...\uploads_fetch\images\..."
-
-      // THIS IS THE BUG!
-      // The URL structure is decoupled from the storage structure when we change uploadsDir.
-
-      // Fix: We should reconstruct the file path using the config, NOT the URL.
-
       const type = media.type
       const ext = path.extname(media.url)
       const fileName = `${id}${ext}`
       const baseDir = path.join(uploadsDir, getDirectoryForType(type))
       const filePath = path.join(baseDir, fileName)
 
-      console.log(`[MediaRouter] Deleting file: ${filePath}`)
       try {
         await unlink(filePath)
       } catch (e) {
-        console.error(`[MediaRouter] Unlink error:`, e)
         return c.json({ error: 'Failed to delete media file' }, 500)
       }
     }
 
     await mediaStorage.delete(id)
-    console.log(`[MediaRouter] Deleted successfully`)
     return c.json({ message: 'Media deleted successfully' })
   } catch (e) {
-    console.error(`[MediaRouter] Delete error:`, e)
     return c.json({ error: 'Failed to delete media' }, 500)
   }
 })
