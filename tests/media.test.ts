@@ -1,0 +1,363 @@
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
+import { mediaRouter } from '../src/routers/media'
+import { createConfigFile } from '../src/config'
+import { mediaStorage } from '../src/store/mediaStore'
+import path from 'path'
+import { mkdir, rm, writeFile } from 'fs/promises'
+
+// Global setup and cleanup for all tests
+beforeEach(async () => {
+  // Setup test environment
+  createConfigFile()
+  
+  // Clean up any existing data
+  const cleanupDirs = ['uploads', 'media']
+  for (const dir of cleanupDirs) {
+    await rm(path.join(process.cwd(), dir), { recursive: true, force: true })
+  }
+  
+  // Create necessary directories
+  const testDirs = ['uploads', 'uploads/images', 'uploads/videos', 'uploads/audios', 'uploads/subtitles', 'media']
+  for (const dir of testDirs) {
+    await mkdir(path.join(process.cwd(), dir), { recursive: true })
+  }
+  
+  // Clear media storage cache by accessing it after creating empty file
+  try {
+    await mediaStorage.getAll()
+    // Force reload by creating new storage instance
+    const { DataStorage } = await import('json-obj-manager')
+    const { JSONFileAdapter } = await import('json-obj-manager/node')
+    const mediaPath = path.join(process.cwd(), 'media', 'media.json')
+    // This will create a new instance with fresh data
+    Object.assign(mediaStorage, new DataStorage(new JSONFileAdapter(mediaPath)))
+  } catch {
+    // Storage doesn't exist yet, that's fine
+  }
+})
+
+afterEach(async () => {
+  // Clean up after each test
+  const cleanupDirs = ['uploads', 'media']
+  for (const dir of cleanupDirs) {
+    await rm(path.join(process.cwd(), dir), { recursive: true, force: true })
+  }
+  
+  // Create media directory and empty JSON file to ensure clean state
+  await mkdir(path.join(process.cwd(), 'media'), { recursive: true })
+  await writeFile(path.join(process.cwd(), 'media', 'media.json'), '{}')
+})
+
+describe('Media Router', () => {
+
+  describe('POST /upload/:type', () => {
+    it('should upload an image file successfully', async () => {
+      // Create a mock image file
+      const imageContent = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) // PNG header
+      const file = new File([imageContent], 'test.png', { type: 'image/png' })
+      
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('name', 'Test Image')
+      formData.append('metadata', JSON.stringify({ tags: ['test', 'image'] }))
+
+      const request = new Request('http://localhost:3000/upload/image', {
+        method: 'POST',
+        body: formData
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(201)
+      expect(data.type).toBe('image')
+      expect(data.name).toBe('Test Image')
+      expect(data.metadata).toEqual({ tags: ['test', 'image'] })
+      expect(data.id).toBeDefined()
+      expect(data.url).toMatch(/^\/uploads\/images\/[\w-]+\.png$/)
+      expect(data.size).toBeGreaterThan(0)
+      expect(data.sizeFormatted).toBeDefined()
+    })
+
+    it('should upload a video file successfully', async () => {
+      const videoContent = new Uint8Array([0, 0, 0, 32, 102, 116, 121, 112]) // MP4 header
+      const file = new File([videoContent], 'test.mp4', { type: 'video/mp4' })
+      
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const request = new Request('http://localhost:3000/upload/video', {
+        method: 'POST',
+        body: formData
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(201)
+      expect(data.type).toBe('video')
+      expect(data.url).toMatch(/^\/uploads\/videos\/[\w-]+\.mp4$/)
+    })
+
+    it('should upload an audio file successfully', async () => {
+      const audioContent = new Uint8Array([73, 68, 51]) // MP3 header
+      const file = new File([audioContent], 'test.mp3', { type: 'audio/mpeg' })
+      
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const request = new Request('http://localhost:3000/upload/audio', {
+        method: 'POST',
+        body: formData
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(201)
+      expect(data.type).toBe('audio')
+      expect(data.url).toMatch(/^\/uploads\/audios\/[\w-]+\.mp3$/)
+    })
+
+    it('should upload a subtitle file successfully', async () => {
+      const subtitleContent = new Uint8Array([87, 69, 66, 86, 84, 84]) // WEBVTT header
+      const file = new File([subtitleContent], 'test.vtt', { type: 'text/vtt' })
+      
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const request = new Request('http://localhost:3000/upload/subtitle', {
+        method: 'POST',
+        body: formData
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(201)
+      expect(data.type).toBe('subtitle')
+      expect(data.url).toMatch(/^\/uploads\/subtitles\/[\w-]+\.vtt$/)
+    })
+
+    it('should reject invalid media type', async () => {
+      const formData = new FormData()
+      formData.append('file', new File(['test'], 'test.txt', { type: 'text/plain' }))
+
+      const request = new Request('http://localhost:3000/upload/invalid', {
+        method: 'POST',
+        body: formData
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain('Invalid media type')
+    })
+
+    it('should reject missing file', async () => {
+      const formData = new FormData()
+
+      const request = new Request('http://localhost:3000/upload/image', {
+        method: 'POST',
+        body: formData
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain('Missing file field')
+    })
+
+    it('should reject file type mismatch', async () => {
+      const formData = new FormData()
+      formData.append('file', new File(['test'], 'test.txt', { type: 'text/plain' }))
+
+      const request = new Request('http://localhost:3000/upload/image', {
+        method: 'POST',
+        body: formData
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain('does not match type')
+    })
+
+    it('should reject invalid metadata JSON', async () => {
+      const file = new File(['test'], 'test.png', { type: 'image/png' })
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('metadata', 'invalid json')
+
+      const request = new Request('http://localhost:3000/upload/image', {
+        method: 'POST',
+        body: formData
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain('Invalid metadata JSON')
+    })
+  })
+
+  describe('DELETE /:id', () => {
+    it('should delete media successfully', async () => {
+      // First upload a file
+      const file = new File(['test content'], 'test.png', { type: 'image/png' })
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadRequest = new Request('http://localhost:3000/upload/image', {
+        method: 'POST',
+        body: formData
+      })
+
+      const uploadResponse = await mediaRouter.request(uploadRequest)
+      const uploadData = await uploadResponse.json()
+
+      // Then delete it
+      const deleteRequest = new Request(`http://localhost:3000/${uploadData.id}`, {
+        method: 'DELETE'
+      })
+
+      const deleteResponse = await mediaRouter.request(deleteRequest)
+      const deleteData = await deleteResponse.json()
+
+      expect(deleteResponse.status).toBe(200)
+      expect(deleteData.message).toContain('deleted successfully')
+    })
+
+    it('should return 404 for non-existent media', async () => {
+      const request = new Request('http://localhost:3000/non-existent-id', {
+        method: 'DELETE'
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(404)
+      expect(data.error).toContain('Media not found')
+    })
+  })
+
+  describe('GET /data/:type', () => {
+    it('should return empty array for type with no media', async () => {
+      const request = new Request('http://localhost:3000/data/video')
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(Array.isArray(data)).toBe(true)
+      expect(data.length).toBe(0)
+    })
+
+    it('should return media by type', async () => {
+      // Upload an image first
+      const file = new File(['test'], 'test.png', { type: 'image/png' })
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadRequest = new Request('http://localhost:3000/upload/image', {
+        method: 'POST',
+        body: formData
+      })
+
+      await mediaRouter.request(uploadRequest)
+
+      // Get images
+      const getRequest = new Request('http://localhost:3000/data/image')
+      const response = await mediaRouter.request(getRequest)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(Array.isArray(data)).toBe(true)
+      expect(data.length).toBeGreaterThan(0)
+      expect(data[0].type).toBe('image')
+    })
+
+    it('should reject invalid type', async () => {
+      const request = new Request('http://localhost:3000/data/invalid')
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain('Invalid media type')
+    })
+  })
+
+  describe('GET /stats', () => {
+    it('should return media statistics', async () => {
+      const request = new Request('http://localhost:3000/stats')
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.total).toBeDefined()
+      expect(data.total.count).toBeDefined()
+      expect(data.total.size).toBeDefined()
+      expect(data.total.sizeFormatted).toBeDefined()
+      expect(data.byType).toBeDefined()
+      expect(data.byType.image).toBeDefined()
+      expect(data.byType.video).toBeDefined()
+      expect(data.byType.audio).toBeDefined()
+      expect(data.byType.subtitle).toBeDefined()
+    })
+  })
+
+  describe('GET /:id/size', () => {
+    it('should return file size for existing media', async () => {
+      // Upload a file first
+      const file = new File(['test content'], 'test.png', { type: 'image/png' })
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadRequest = new Request('http://localhost:3000/upload/image', {
+        method: 'POST',
+        body: formData
+      })
+
+      const uploadResponse = await mediaRouter.request(uploadRequest)
+      const uploadData = await uploadResponse.json()
+
+      // Get file size
+      const sizeRequest = new Request(`http://localhost:3000/${uploadData.id}/size`)
+      const response = await mediaRouter.request(sizeRequest)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.id).toBe(uploadData.id)
+      expect(data.size).toBeDefined()
+      expect(data.sizeFormatted).toBeDefined()
+    })
+
+    it('should return 404 for non-existent media', async () => {
+      const request = new Request('http://localhost:3000/non-existent-id/size')
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(404)
+      expect(data.error).toContain('Media not found')
+    })
+  })
+
+  describe('POST /sync', () => {
+    it('should sync media files', async () => {
+      const request = new Request('http://localhost:3000/sync', {
+        method: 'POST'
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.message).toContain('Sync completed')
+      expect(data.added).toBeDefined()
+      expect(data.details).toBeDefined()
+    })
+  })
+})

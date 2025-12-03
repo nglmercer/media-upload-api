@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { mediaRouter } from './routers/media'
-import { TriggerRouter } from './routers/Trigger'
 import { mediaStorage } from './store/mediaStore'
 import { upgradeWebSocket, websocket } from 'hono/bun'
 import { cors } from 'hono/cors'
@@ -20,13 +19,11 @@ app.use(cors({
 app.get('/', (c) => {
   return c.text('Hello Hono!')
 })
-const defaultTriggerEvent = "TriggerEvents:ID"
 // Serve uploaded files
 app.use('/uploads/*', serveStatic({ root: './' }))
 
 // Mount media routes
 app.route('/api/media', mediaRouter)
-app.route('/api/trigger', TriggerRouter)
 app.get('/api/media/data', async (c) => {
   const data = await mediaStorage.getAll();
   return c.json(data);
@@ -36,14 +33,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${socket.id}`)
   })
-  emitter.on(defaultTriggerEvent, (data) => {
-    console.log(defaultTriggerEvent,data)
-    io.emit(defaultTriggerEvent,data)
-  })
-  socket.on(defaultTriggerEvent, (data) => {
-    console.log(defaultTriggerEvent,data)
-    io.emit(defaultTriggerEvent,data)
-  })
+
 })
 app.get(
   '/ws',
