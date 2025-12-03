@@ -1,8 +1,4 @@
-// src/config/apiConfig.ts
-
-// 1. Define una interfaz clara para la configuración
-// types.ts - Tipos para la configuración de proxy
-interface ProxyConfig {
+export interface ProxyConfig {
   enabled: boolean;
   url: string;
   auth?: {
@@ -12,43 +8,125 @@ interface ProxyConfig {
   timeout?: number;
 }
 
-interface ApiConfig {
+export interface ApiConfig {
   host: string;
-  port: number | string;
+  port?: number | string;
   protocol: 'http' | 'https';
+  apiPrefix?: string;
+
+  // Methods
   getFullUrl: () => string;
-  update: (newConfig: Partial<Omit<ApiConfig, 'getFullUrl' | 'update'>>) => void;
+  getWsUrl: () => string; // <--- New Method Definition
+  // Updated Omit to include getWsUrl
+  update: (newConfig: Partial<Omit<ApiConfig, 'getFullUrl' | 'getWsUrl' | 'update'>>) => void;
   proxy?: ProxyConfig;
 }
-/*
-const windowurl: string = typeof window !== "undefined" ? window.location.origin : "";
-// 2. Crea el objeto de configuración como la única fuente de la verdad
-  protocol: import.meta.env.MODE === 'development' ? 'http' : 'https',
-  api Unoficial y local, en el build usamos http y no http porque no es un deploy ni esta en el mismo dominio
-*/
-// src/config/apiConfig.ts
-const apiConfig: ApiConfig = {
-  host: import.meta.env.VITE_API_HOST || '127.0.0.1',
-  port: import.meta.env.VITE_API_PORT || 3000,
-  protocol: 'http',
-  getFullUrl(): string {
-    return `${this.protocol}://${this.host}:${this.port}`;
-  },
-  update(newConfig) {
-    Object.assign(this, newConfig);
-    console.log('API config updated:', this.getFullUrl());
-  },
-  // Agregar configuración del proxy basada en variables de entorno
-  proxy: import.meta.env.VITE_USE_PROXY === 'true' ? {
-    enabled: true,
-    url: import.meta.env.VITE_PROXY_URL || 'http://localhost:3001',
-    auth: (import.meta.env.VITE_PROXY_USERNAME && import.meta.env.VITE_PROXY_PASSWORD) ? {
-      username: import.meta.env.VITE_PROXY_USERNAME,
-      password: import.meta.env.VITE_PROXY_PASSWORD
-    } : undefined,
-    timeout: 30000
-  } : undefined
+
+// 2. Adapters Interface
+interface EnvironmentAdapter {
+  // Updated Omit to include getWsUrl
+  getConfig: () => Partial<Omit<ApiConfig, 'getFullUrl' | 'getWsUrl' | 'update'>>;
+}
+
+// 3. Concrete Adapters
+
+// Adapter for Development
+const DevelopmentAdapter: EnvironmentAdapter = {
+  getConfig: () => ({
+    host: import.meta.env.VITE_API_HOST || '127.0.0.1',
+    port: import.meta.env.VITE_API_PORT || 3000,
+    protocol: 'http',
+    proxy: import.meta.env.VITE_USE_PROXY === 'true' ? {
+      enabled: true,
+      url: import.meta.env.VITE_PROXY_URL || 'http://localhost:3001',
+      auth: (import.meta.env.VITE_PROXY_USERNAME && import.meta.env.VITE_PROXY_PASSWORD) ? {
+        username: import.meta.env.VITE_PROXY_USERNAME,
+        password: import.meta.env.VITE_PROXY_PASSWORD
+      } : undefined,
+      timeout: 30000
+    } : undefined
+  })
 };
 
+// Adapter for Production
+const ProductionAdapter: EnvironmentAdapter = {
+  getConfig: () => {
+    const isBrowser = typeof window !== 'undefined';
+    const defaultHost = isBrowser ? window.location.hostname : 'localhost';
+    const defaultProtocol = isBrowser && window.location.protocol.includes('https') ? 'https' : 'https';
+
+    return {
+      host: import.meta.env.VITE_API_HOST || defaultHost,
+      port: import.meta.env.VITE_API_PORT ? Number(import.meta.env.VITE_API_PORT) : undefined,
+      protocol: (import.meta.env.VITE_API_PROTOCOL as 'http' | 'https') || defaultProtocol,
+      proxy: undefined
+    };
+  }
+};
+
+// 4. Factory
+const getConfigAdapter = (): EnvironmentAdapter => {
+  if (import.meta.env.MODE === 'production') {
+    return ProductionAdapter;
+  }
+  return DevelopmentAdapter;
+};
+
+// 5. Implementation
+const createApiConfig = (): ApiConfig => {
+  const adapter = getConfigAdapter();
+  const initialConfig = adapter.getConfig();
+
+  return {
+    host: initialConfig.host || 'localhost',
+    port: initialConfig.port,
+    protocol: initialConfig.protocol || 'http',
+    proxy: initialConfig.proxy,
+
+    getFullUrl() {
+      const protocol = this.protocol;
+      const host = this.host;
+      const port = this.port;
+
+      const isStandardPort =
+        (!port) ||
+        (protocol === 'http' && Number(port) === 80) ||
+        (protocol === 'https' && Number(port) === 443);
+
+      const portSuffix = isStandardPort ? '' : `:${port}`;
+
+      return `${protocol}://${host}${portSuffix}`;
+    },
+
+    // --- New Implementation ---
+    getWsUrl() {
+      // Determine protocol: http -> ws, https -> wss
+      const isSecure = this.protocol === 'https';
+      const wsProtocol = isSecure ? 'wss' : 'ws';
+
+      const host = this.host;
+      const port = this.port;
+
+      // Re-use logic: Omit port if it's standard for the protocol
+      // Note: ws uses port 80, wss uses port 443 (same as http/s)
+      const isStandardPort =
+        (!port) ||
+        (this.protocol === 'http' && Number(port) === 80) ||
+        (this.protocol === 'https' && Number(port) === 443);
+
+      const portSuffix = isStandardPort ? '' : `:${port}`;
+
+      return `${wsProtocol}://${host}${portSuffix}`;
+    },
+
+    update(newConfig) {
+      Object.assign(this, newConfig);
+      // Optional: Log both URLs to verify update
+      // console.log('[ApiConfig] Updated.', { http: this.getFullUrl(), ws: this.getWsUrl() });
+    }
+  };
+};
+
+export const apiConfig = createApiConfig();
+
 export default apiConfig;
-export type{ ApiConfig, ProxyConfig,apiConfig};

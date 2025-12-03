@@ -6,35 +6,41 @@ import { upgradeWebSocket, websocket } from 'hono/bun'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { ServerWebSocket } from 'bun';
-import { io,type WebSocketData } from './websocket-adapter';
+import { io, type WebSocketData } from './websocket-adapter';
 import { emitter } from './Emitter';
-import { loadConfig,createConfigFile,saveConfig } from './config'
+import { loadConfig, createConfigFile, saveConfig } from './config'
+
 createConfigFile()
 const config = loadConfig()
 const app = new Hono()
+
 app.use(logger())
 app.use(cors({
   origin: '*',
 }))
+
 app.get('/', (c) => {
   return c.text('Hello Hono!')
 })
+
 // Serve uploaded files
 app.use('/uploads/*', serveStatic({ root: './' }))
 
 // Mount media routes
 app.route('/api/media', mediaRouter)
+
 app.get('/api/media/data', async (c) => {
   const data = await mediaStorage.getAll();
   return c.json(data);
 })
+
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`)
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${socket.id}`)
   })
-
 })
+
 app.get(
   '/ws',
   upgradeWebSocket((c) => {
@@ -60,6 +66,7 @@ app.get(
     }
   })
 )
+
 try {
   const server = Bun.serve({
     fetch: app.fetch,
@@ -71,7 +78,7 @@ try {
     port: server.port,
   })
 } catch (error) {
-   const server = Bun.serve({
+  const server = Bun.serve({
     fetch: app.fetch,
     port: 0,
     websocket,
