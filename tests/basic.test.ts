@@ -1,5 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
 import { setupTestEnvironment, cleanupTestEnvironment, createMockFile } from './helpers/test-utils'
+
+mock.module("../src/config", () => ({
+  loadConfig: () => ({
+    port: 0,
+    host: "localhost",
+    uploadsDir: "uploads_basic",
+    mediaFile: "media/media_basic.json"
+  }),
+  createConfigFile: () => { },
+  saveConfig: () => { }
+}));
 
 describe('Basic Test Infrastructure', () => {
   beforeEach(async () => {

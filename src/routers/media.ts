@@ -1,9 +1,11 @@
 import { Hono } from "hono"
 import path from "path"
 import fs from "fs"
-import { mkdir } from "fs/promises"
+import { mkdir, unlink } from "fs/promises"
 import { mediaStorage, ensureRecordForUrl } from "../store/mediaStore"
 import type { MediaType } from "../store/types"
+import { loadConfig } from "../config"
+
 const mediaRouter = new Hono()
 
 
@@ -31,9 +33,9 @@ const EXT_BY_MIME: Record<string, string> = {
 }
 
 // Validation sets for file extensions
-const EXT_IMAGE = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"]) 
-const EXT_AUDIO = new Set([".mp3", ".wav", ".ogg", ".weba"]) 
-const EXT_VIDEO = new Set([".mp4", ".webm", ".ogv"]) 
+const EXT_IMAGE = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"])
+const EXT_AUDIO = new Set([".mp3", ".wav", ".ogg", ".weba"])
+const EXT_VIDEO = new Set([".mp4", ".webm", ".ogv"])
 const EXT_SUBTITLE = new Set([".vtt", ".srt", ".ssa", ".ass", ".sub"])
 
 function extFromFile(file: File): string {
@@ -98,7 +100,13 @@ mediaRouter.post("/upload/:type", async (c) => {
 
   const id = crypto.randomUUID()
   const ext = extFromFile(file)
-  const baseDir = path.join(process.cwd(), "uploads", getDirectoryForType(type))
+
+  const config = loadConfig()
+  const uploadsDir = path.isAbsolute(config.uploadsDir)
+    ? config.uploadsDir
+    : path.join(process.cwd(), config.uploadsDir)
+
+  const baseDir = path.join(uploadsDir, getDirectoryForType(type))
   const fileName = `${id}${ext}`
   const filePath = path.join(baseDir, fileName)
 
@@ -141,25 +149,75 @@ mediaRouter.post("/upload/:type", async (c) => {
 mediaRouter.delete('/:id', async (c) => {
   const params = c.req.param()
   const id = params.id
-  
+  console.log(`[MediaRouter] Deleting media: ${id}`)
+
   try {
     const media = await mediaStorage.load(id)
     if (!media) {
+      console.log(`[MediaRouter] Media not found: ${id}`)
       return c.json({ error: 'Media not found' }, 404)
     }
-    
+
     if (media.url) {
-      const filePath = path.join(process.cwd(), media.url)
+      const config = loadConfig()
+      const uploadsDir = path.isAbsolute(config.uploadsDir)
+        ? config.uploadsDir
+        : path.join(process.cwd(), config.uploadsDir)
+
+      // media.url is like /uploads/images/file.png
+      // We need to map it to the configured uploadsDir
+      // But media.url starts with /uploads/
+      // If uploadsDir is "uploads_fetch", we need to replace /uploads/ with uploads_fetch path?
+      // NO! media.url is relative to the web root.
+      // But we are deleting from DISK.
+
+      // The current implementation assumes media.url is relative to CWD if we join with process.cwd().
+      // But we changed uploadsDir!
+
+      // If media.url is "/uploads/images/file.png"
+      // And uploadsDir is "uploads_fetch" (absolute path)
+      // We need to construct the file path correctly.
+
+      // The upload logic constructs url as `/uploads/${getDirectoryForType(type)}/${fileName}`.
+      // This is hardcoded "/uploads/".
+
+      // If we use a custom uploadsDir, we should probably store the relative path from uploadsDir?
+      // Or we need to know how to map URL to File Path.
+
+      // Current implementation in DELETE:
+      // const filePath = path.join(process.cwd(), media.url)
+
+      // This assumes media.url matches the file system structure relative to CWD.
+      // If uploadsDir is "uploads_fetch", then file is at "uploads_fetch/images/file.png".
+      // But media.url is "/uploads/images/file.png".
+      // So path.join(cwd, "/uploads/images/...") -> "C:\...\uploads\images\..."
+      // But the file is at "C:\...\uploads_fetch\images\..."
+
+      // THIS IS THE BUG!
+      // The URL structure is decoupled from the storage structure when we change uploadsDir.
+
+      // Fix: We should reconstruct the file path using the config, NOT the URL.
+
+      const type = media.type
+      const ext = path.extname(media.url)
+      const fileName = `${id}${ext}`
+      const baseDir = path.join(uploadsDir, getDirectoryForType(type))
+      const filePath = path.join(baseDir, fileName)
+
+      console.log(`[MediaRouter] Deleting file: ${filePath}`)
       try {
-        await fs.promises.unlink(filePath)
+        await unlink(filePath)
       } catch (e) {
+        console.error(`[MediaRouter] Unlink error:`, e)
         return c.json({ error: 'Failed to delete media file' }, 500)
       }
     }
-    
+
     await mediaStorage.delete(id)
+    console.log(`[MediaRouter] Deleted successfully`)
     return c.json({ message: 'Media deleted successfully' })
   } catch (e) {
+    console.error(`[MediaRouter] Delete error:`, e)
     return c.json({ error: 'Failed to delete media' }, 500)
   }
 })
@@ -170,31 +228,36 @@ mediaRouter.post('/sync', async (c) => {
   const known = new Set(Object.values(existing).map((m) => m.url))
 
   let addedTotal = 0
-  const addedByType: Record<MediaType, number> = { 
-    image: 0, 
-    audio: 0, 
-    video: 0, 
-    subtitle: 0 
+  const addedByType: Record<MediaType, number> = {
+    image: 0,
+    audio: 0,
+    video: 0,
+    subtitle: 0
   }
 
+  const config = loadConfig()
+  const uploadsDir = path.isAbsolute(config.uploadsDir)
+    ? config.uploadsDir
+    : path.join(process.cwd(), config.uploadsDir)
+
   for (const type of types) {
-    const dir = path.join(process.cwd(), 'uploads', getDirectoryForType(type))
+    const dir = path.join(uploadsDir, getDirectoryForType(type))
     let files: string[] = []
-    
+
     try {
       files = await fs.promises.readdir(dir)
     } catch {
       continue
     }
-    
+
     for (const file of files) {
       if (file.startsWith('.')) continue
 
       const ext = path.extname(file).toLowerCase()
-      const extSet = type === 'image' ? EXT_IMAGE 
-                   : type === 'audio' ? EXT_AUDIO 
-                   : type === 'video' ? EXT_VIDEO 
-                   : EXT_SUBTITLE
+      const extSet = type === 'image' ? EXT_IMAGE
+        : type === 'audio' ? EXT_AUDIO
+          : type === 'video' ? EXT_VIDEO
+            : EXT_SUBTITLE
 
       if (!extSet.has(ext)) continue
 
@@ -218,43 +281,54 @@ mediaRouter.post('/sync', async (c) => {
 mediaRouter.get('/data/:type', async (c) => {
   const params = c.req.param()
   const type = params.type as MediaType
-  
+
   if (!type || !["image", "audio", "video", "subtitle"].includes(type)) {
     return c.json({ error: "Invalid media type. Use image, audio, video, or subtitle." }, 400)
   }
-  
+
   const data = await mediaStorage.getAll()
   const filtered = Object.values(data).filter((m) => m.type === type)
-  
+
   return c.json(filtered)
 })
 
 mediaRouter.get('/stats', async (c) => {
   const data = await mediaStorage.getAll()
   const allMedia = Object.values(data)
-  
+
   const stats = {
     total: {
       count: allMedia.length,
       size: 0,
-      sizeFormatted: "0 B"  
+      sizeFormatted: "0 B"
     },
     byType: {} as Record<MediaType, { count: number; size: number; sizeFormatted: string }>
   }
 
   const types: MediaType[] = ['image', 'audio', 'video', 'subtitle']
-  
+
   for (const type of types) {
     stats.byType[type] = { count: 0, size: 0, sizeFormatted: "0 B" }
   }
 
   for (const media of allMedia) {
     // Calculate actual file size from disk
-    const filePath = path.join(process.cwd(), media.url)
+    const config = loadConfig()
+    const uploadsDir = path.isAbsolute(config.uploadsDir)
+      ? config.uploadsDir
+      : path.join(process.cwd(), config.uploadsDir)
+
+    // Reconstruct path properly
+    const type = media.type
+    const ext = path.extname(media.url)
+    const fileName = `${media.id}${ext}`
+    const baseDir = path.join(uploadsDir, getDirectoryForType(type))
+    const filePath = path.join(baseDir, fileName)
+
     const size = await getFileSize(filePath)
-    
+
     stats.total.size += size
-    
+
     if (media.type in stats.byType) {
       stats.byType[media.type].count++
       stats.byType[media.type].size += size
@@ -262,7 +336,7 @@ mediaRouter.get('/stats', async (c) => {
   }
 
   stats.total.sizeFormatted = formatFileSize(stats.total.size)
-  
+
   for (const type of types) {
     stats.byType[type].sizeFormatted = formatFileSize(stats.byType[type].size)
   }
@@ -273,16 +347,27 @@ mediaRouter.get('/stats', async (c) => {
 mediaRouter.get('/:id/size', async (c) => {
   const params = c.req.param()
   const id = params.id
-  
+
   try {
     const media = await mediaStorage.load(id)
     if (!media) {
       return c.json({ error: 'Media not found' }, 404)
     }
-    
-    const filePath = path.join(process.cwd(), media.url)
+
+    const config = loadConfig()
+    const uploadsDir = path.isAbsolute(config.uploadsDir)
+      ? config.uploadsDir
+      : path.join(process.cwd(), config.uploadsDir)
+
+    // Reconstruct path properly
+    const type = media.type
+    const ext = path.extname(media.url)
+    const fileName = `${media.id}${ext}`
+    const baseDir = path.join(uploadsDir, getDirectoryForType(type))
+    const filePath = path.join(baseDir, fileName)
+
     const size = await getFileSize(filePath)
-    
+
     return c.json({
       id: media.id,
       size,

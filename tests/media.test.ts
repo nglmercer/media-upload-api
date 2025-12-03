@@ -1,36 +1,51 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { mediaRouter } from '../src/routers/media'
-import { createConfigFile } from '../src/config'
-import { mediaStorage } from '../src/store/mediaStore'
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
 import path from 'path'
 import { mkdir, rm, writeFile } from 'fs/promises'
 
+const TEST_MEDIA_FILE = path.join(process.cwd(), "media/media_router.json");
+const TEST_UPLOADS_DIR = path.join(process.cwd(), "uploads_router");
+
+mock.module("../src/config", () => ({
+  loadConfig: () => ({
+    port: 0,
+    host: "localhost",
+    uploadsDir: TEST_UPLOADS_DIR,
+    mediaFile: TEST_MEDIA_FILE
+  }),
+  createConfigFile: () => { },
+  saveConfig: () => { }
+}));
+
+// Dynamic imports
+const { mediaRouter } = await import('../src/routers/media');
+const MediaStoreModule = await import('../src/store/mediaStore');
+
 // Global setup and cleanup for all tests
 beforeEach(async () => {
-  // Setup test environment
-  createConfigFile()
-  
   // Clean up any existing data
-  const cleanupDirs = ['uploads', 'media']
-  for (const dir of cleanupDirs) {
-    await rm(path.join(process.cwd(), dir), { recursive: true, force: true })
-  }
-  
+  await rm(TEST_UPLOADS_DIR, { recursive: true, force: true });
+  await rm(path.dirname(TEST_MEDIA_FILE), { recursive: true, force: true });
+
   // Create necessary directories
-  const testDirs = ['uploads', 'uploads/images', 'uploads/videos', 'uploads/audios', 'uploads/subtitles', 'media']
+  const testDirs = [
+    TEST_UPLOADS_DIR,
+    path.join(TEST_UPLOADS_DIR, 'images'),
+    path.join(TEST_UPLOADS_DIR, 'videos'),
+    path.join(TEST_UPLOADS_DIR, 'audios'),
+    path.join(TEST_UPLOADS_DIR, 'subtitles'),
+    path.dirname(TEST_MEDIA_FILE)
+  ];
   for (const dir of testDirs) {
-    await mkdir(path.join(process.cwd(), dir), { recursive: true })
+    await mkdir(dir, { recursive: true })
   }
-  
+
   // Clear media storage cache by accessing it after creating empty file
   try {
-    await mediaStorage.getAll()
     // Force reload by creating new storage instance
     const { DataStorage } = await import('json-obj-manager')
     const { JSONFileAdapter } = await import('json-obj-manager/node')
-    const mediaPath = path.join(process.cwd(), 'media', 'media.json')
     // This will create a new instance with fresh data
-    Object.assign(mediaStorage, new DataStorage(new JSONFileAdapter(mediaPath)))
+    MediaStoreModule.setMediaStorage(new DataStorage(new JSONFileAdapter(TEST_MEDIA_FILE)))
   } catch {
     // Storage doesn't exist yet, that's fine
   }
@@ -38,14 +53,11 @@ beforeEach(async () => {
 
 afterEach(async () => {
   // Clean up after each test
-  const cleanupDirs = ['uploads', 'media']
-  for (const dir of cleanupDirs) {
-    await rm(path.join(process.cwd(), dir), { recursive: true, force: true })
-  }
-  
-  // Create media directory and empty JSON file to ensure clean state
-  await mkdir(path.join(process.cwd(), 'media'), { recursive: true })
-  await writeFile(path.join(process.cwd(), 'media', 'media.json'), '{}')
+  await rm(TEST_UPLOADS_DIR, { recursive: true, force: true });
+  await rm(path.dirname(TEST_MEDIA_FILE), { recursive: true, force: true });
+
+  await mkdir(path.dirname(TEST_MEDIA_FILE), { recursive: true })
+  await writeFile(TEST_MEDIA_FILE, '{}')
 })
 
 describe('Media Router', () => {
@@ -55,7 +67,7 @@ describe('Media Router', () => {
       // Create a mock image file
       const imageContent = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) // PNG header
       const file = new File([imageContent], 'test.png', { type: 'image/png' })
-      
+
       const formData = new FormData()
       formData.append('file', file)
       formData.append('name', 'Test Image')
@@ -82,7 +94,7 @@ describe('Media Router', () => {
     it('should upload a video file successfully', async () => {
       const videoContent = new Uint8Array([0, 0, 0, 32, 102, 116, 121, 112]) // MP4 header
       const file = new File([videoContent], 'test.mp4', { type: 'video/mp4' })
-      
+
       const formData = new FormData()
       formData.append('file', file)
 
@@ -102,7 +114,7 @@ describe('Media Router', () => {
     it('should upload an audio file successfully', async () => {
       const audioContent = new Uint8Array([73, 68, 51]) // MP3 header
       const file = new File([audioContent], 'test.mp3', { type: 'audio/mpeg' })
-      
+
       const formData = new FormData()
       formData.append('file', file)
 
@@ -122,7 +134,7 @@ describe('Media Router', () => {
     it('should upload a subtitle file successfully', async () => {
       const subtitleContent = new Uint8Array([87, 69, 66, 86, 84, 84]) // WEBVTT header
       const file = new File([subtitleContent], 'test.vtt', { type: 'text/vtt' })
-      
+
       const formData = new FormData()
       formData.append('file', file)
 

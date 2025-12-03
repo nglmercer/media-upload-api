@@ -1,14 +1,48 @@
 import { DataStorage } from 'json-obj-manager';
 import { JSONFileAdapter } from 'json-obj-manager/node';
 import path from 'path';
-import type{ MediaType,MediaItem } from './types';
-const MediaPath = path.join(process.cwd(), 'media', 'media.json');
+import type { MediaType, MediaItem } from './types';
+import { loadConfig } from '../config';
 
+const config = loadConfig();
+const MediaPath = path.isAbsolute(config.mediaFile)
+  ? config.mediaFile
+  : path.join(process.cwd(), config.mediaFile);
 
+class ProxyStorage {
+  private _storage: DataStorage<MediaItem>;
 
-const mediaStorage = new DataStorage<MediaItem>(
-  new JSONFileAdapter(MediaPath)
-)
+  constructor(storage: DataStorage<MediaItem>) {
+    this._storage = storage;
+  }
+
+  setTarget(storage: DataStorage<MediaItem>) {
+    this._storage = storage;
+  }
+
+  async load(id: string): Promise<MediaItem | null> {
+    return this._storage.load(id);
+  }
+
+  async save(id: string, data: MediaItem): Promise<void> {
+    return this._storage.save(id, data);
+  }
+
+  async delete(id: string): Promise<void> {
+    return this._storage.delete(id);
+  }
+
+  async getAll(): Promise<Record<string, MediaItem>> {
+    return this._storage.getAll();
+  }
+}
+
+const initialStorage = new DataStorage<MediaItem>(new JSONFileAdapter(MediaPath));
+export const mediaStorage = new ProxyStorage(initialStorage);
+
+export function setMediaStorage(storage: DataStorage<MediaItem>) {
+  mediaStorage.setTarget(storage);
+}
 
 export async function ensureRecordForUrl(params: {
   type: MediaType
@@ -36,5 +70,3 @@ export async function ensureRecordForUrl(params: {
   await mediaStorage.save(id, record)
   return record
 }
-
-export { mediaStorage }

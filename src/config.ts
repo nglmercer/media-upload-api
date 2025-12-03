@@ -4,12 +4,16 @@ import path from "path";
 interface Config {
   port: number;
   host: string;
+  uploadsDir: string;
+  mediaFile: string;
 }
 
 class ConfigManager {
   static readonly DEFAULT_CONFIG: Config = {
     port: 21100,
     host: "0.0.0.0",
+    uploadsDir: "uploads",
+    mediaFile: "media/media.json",
   };
 
   static readonly CONFIG_PATH = path.join(process.cwd(), "config.json");
