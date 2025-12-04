@@ -80,6 +80,9 @@ class MediaApi extends PrefixedApi {
   async getAllMedia(): Promise<Record<string, MediaRecord>> {
     return this.get<Record<string, MediaRecord>>('/data');
   }
+  async getMediaById(id: string): Promise<MediaRecord> {
+    return this.get<MediaRecord>(`/${id}`);
+  }
 }
 
 export default MediaApi;

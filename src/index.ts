@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { mediaRouter } from './routers/media'
+import { draftsRouter } from './routers/drafts'
 import { mediaStorage } from './store/mediaStore'
 import { upgradeWebSocket, websocket } from 'hono/bun'
 import { cors } from 'hono/cors'
@@ -28,6 +29,7 @@ app.use('/uploads/*', serveStatic({ root: './' }))
 
 // Mount media routes
 app.route('/api/media', mediaRouter)
+app.route('/api/drafts', draftsRouter)
 
 
 
