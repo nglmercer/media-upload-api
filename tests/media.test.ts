@@ -380,9 +380,8 @@ describe('Media Router', () => {
   })
 
   describe('GET /:id', () => {
-    it('should return media details by id', async () => {
+    it('should return media details for existing media', async () => {
       // Upload a file first
-      const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
       const file = new File([PNG_HEADER], 'test.png', { type: 'image/png' })
       const formData = new FormData()
       formData.append('file', file)
@@ -396,8 +395,8 @@ describe('Media Router', () => {
       const uploadData = await uploadResponse.json()
 
       // Get media details
-      const request = new Request(`http://localhost:3000/${uploadData.id}`)
-      const response = await mediaRouter.request(request)
+      const getRequest = new Request(`http://localhost:3000/${uploadData.id}`)
+      const response = await mediaRouter.request(getRequest)
       const data = await response.json()
 
       expect(response.status).toBe(200)

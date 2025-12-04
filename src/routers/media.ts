@@ -297,6 +297,11 @@ mediaRouter.post('/sync', async (c) => {
   })
 })
 
+mediaRouter.get('/data', async (c) => {
+  const data = await mediaStorage.getAll()
+  return c.json(data)
+})
+
 mediaRouter.get('/data/:type', async (c) => {
   const params = c.req.param()
   const type = params.type as MediaType
@@ -361,6 +366,20 @@ mediaRouter.get('/stats', async (c) => {
   }
 
   return c.json(stats)
+})
+
+mediaRouter.get('/:id', async (c) => {
+  const id = c.req.param('id')
+
+  try {
+    const media = await mediaStorage.load(id)
+    if (!media) {
+      return c.json({ error: 'Media not found' }, 404)
+    }
+    return c.json(media)
+  } catch (e) {
+    return c.json({ error: 'Failed to fetch media' }, 500)
+  }
 })
 
 mediaRouter.get('/:id/size', async (c) => {

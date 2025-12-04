@@ -29,10 +29,7 @@ app.use('/uploads/*', serveStatic({ root: './' }))
 // Mount media routes
 app.route('/api/media', mediaRouter)
 
-app.get('/api/media/data', async (c) => {
-  const data = await mediaStorage.getAll();
-  return c.json(data);
-})
+
 
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`)
