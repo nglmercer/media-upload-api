@@ -34,6 +34,7 @@ app.get('/api/media/data', async (c) => {
 })
 
 let server: any;
+//@ts-ignore
 let api: MediaApi;
 
 describe('Media API with Fetch', () => {
@@ -157,6 +158,7 @@ describe('Media API with Fetch', () => {
         const all = await api.getAllMedia();
         const allValues = Object.values(all);
         expect(allValues.length).toBe(1);
+        //@ts-expect-error
         expect(allValues[0].id).toBe(uploaded.id);
     });
 });

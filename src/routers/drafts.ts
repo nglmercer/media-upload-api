@@ -1,6 +1,7 @@
 import { Hono } from "hono"
 import { draftStore } from "../store/draftStore"
 import type { Draft } from "../store/types"
+import { draftSchema, draftUpdateSchema } from "../validators/draft"
 
 const draftsRouter = new Hono()
 
@@ -24,24 +25,26 @@ draftsRouter.get('/:id', async (c) => {
 
 // Create draft
 draftsRouter.post('/', async (c) => {
-    let body: Partial<Draft>
+    let body
     try {
         body = await c.req.json()
     } catch {
         return c.json({ error: 'Invalid JSON body' }, 400)
     }
 
-    if (!body.content && !body.mediaIds) {
-        return c.json({ error: 'Draft must have content or mediaIds' }, 400)
+    const result = draftSchema.safeParse(body)
+    if (!result.success) {
+        return c.json({ error: result.error.issues }, 400)
     }
 
+    const data = result.data
     const id = crypto.randomUUID()
     const now = Date.now()
 
     const draft: Draft = {
         id,
-        content: body.content || '',
-        mediaIds: body.mediaIds || [],
+        content: data.content || '',
+        mediaIds: data.mediaIds || [],
         createdAt: now,
         updatedAt: now
     }
@@ -59,17 +62,24 @@ draftsRouter.put('/:id', async (c) => {
         return c.json({ error: 'Draft not found' }, 404)
     }
 
-    let body: Partial<Draft>
+    let body
     try {
         body = await c.req.json()
     } catch {
         return c.json({ error: 'Invalid JSON body' }, 400)
     }
 
+    const result = draftUpdateSchema.safeParse(body)
+    if (!result.success) {
+        return c.json({ error: result.error.issues }, 400)
+    }
+
+    const data = result.data
+
     const updated: Draft = {
         ...existing,
-        content: body.content ?? existing.content,
-        mediaIds: body.mediaIds ?? existing.mediaIds,
+        content: data.content ?? existing.content,
+        mediaIds: data.mediaIds ?? existing.mediaIds,
         updatedAt: Date.now()
     }
 

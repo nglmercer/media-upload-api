@@ -379,6 +379,43 @@ describe('Media Router', () => {
     })
   })
 
+  describe('GET /:id', () => {
+    it('should return media details by id', async () => {
+      // Upload a file first
+      const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
+      const file = new File([PNG_HEADER], 'test.png', { type: 'image/png' })
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadRequest = new Request('http://localhost:3000/upload/image', {
+        method: 'POST',
+        body: formData
+      })
+
+      const uploadResponse = await mediaRouter.request(uploadRequest)
+      const uploadData = await uploadResponse.json()
+
+      // Get media details
+      const request = new Request(`http://localhost:3000/${uploadData.id}`)
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.id).toBe(uploadData.id)
+      expect(data.type).toBe('image')
+      expect(data.url).toBeDefined()
+    })
+
+    it('should return 404 for non-existent media', async () => {
+      const request = new Request('http://localhost:3000/non-existent-id')
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(404)
+      expect(data.error).toContain('Media not found')
+    })
+  })
+
   describe('POST /sync', () => {
     it('should sync media files', async () => {
       const request = new Request('http://localhost:3000/sync', {

@@ -13,7 +13,7 @@ export function initDraftStore() {
     // Use a separate file for drafts, e.g., drafts.json in the same directory as media.json
     const draftsFile = path.join(path.dirname(mediaFile), 'drafts.json')
 
-    const adapter = new JSONFileAdapter(draftsFile)
+    const adapter = new JSONFileAdapter<Draft>(draftsFile)
     draftStorage = new DataStorage<Draft>(adapter)
 }
 
@@ -31,7 +31,8 @@ export const draftStore = {
     },
 
     async get(id: string): Promise<Draft | undefined> {
-        return getStorage().load(id)
+        const item = await getStorage().load(id)
+        return item ?? undefined
     },
 
     async save(id: string, draft: Draft): Promise<void> {
