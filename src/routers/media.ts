@@ -5,9 +5,9 @@ import { mkdir, unlink } from "fs/promises"
 import { mediaStorage, ensureRecordForUrl } from "../store/mediaStore"
 import type { MediaType } from "../store/types"
 import { loadConfig } from "../config"
+import { fileTypeFromBuffer } from 'file-type'
 
 const mediaRouter = new Hono()
-
 
 const EXT_BY_MIME: Record<string, string> = {
   // image
@@ -30,6 +30,13 @@ const EXT_BY_MIME: Record<string, string> = {
   "application/x-subrip": ".srt",
   "text/x-ssa": ".ssa",
   "text/x-ass": ".ass",
+  // text
+  "text/plain": ".txt",
+  "text/markdown": ".md",
+  "application/json": ".json",
+  "text/xml": ".xml",
+  "application/xml": ".xml",
+  "text/csv": ".csv",
 }
 
 // Validation sets for file extensions
@@ -37,6 +44,7 @@ const EXT_IMAGE = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"])
 const EXT_AUDIO = new Set([".mp3", ".wav", ".ogg", ".weba"])
 const EXT_VIDEO = new Set([".mp4", ".webm", ".ogv"])
 const EXT_SUBTITLE = new Set([".vtt", ".srt", ".ssa", ".ass", ".sub"])
+const EXT_TEXT = new Set([".txt", ".md", ".json", ".xml", ".csv", ".log"])
 
 function extFromFile(file: File): string {
   const byMime = EXT_BY_MIME[file.type]
@@ -46,16 +54,64 @@ function extFromFile(file: File): string {
   return dot >= 0 ? name.slice(dot).toLowerCase() : ""
 }
 
-function isTypeMatch(file: File, type: MediaType): boolean {
-  if (type === "subtitle") {
-    const ext = extFromFile(file)
-    return EXT_SUBTITLE.has(ext)
+function isBinaryBuffer(buffer: Buffer): boolean {
+  const checkLen = Math.min(buffer.length, 1000)
+  for (let i = 0; i < checkLen; i++) {
+    if (buffer[i] === 0) return true
   }
-  return file.type?.startsWith(type + "/") ?? false
+  return false
+}
+
+async function validateFileType(file: File, type: MediaType): Promise<boolean> {
+  const buffer = await file.arrayBuffer()
+  const nodeBuffer = Buffer.from(buffer)
+
+  // 1. Try to detect type with file-type (checks magic numbers)
+  let detected;
+  try {
+    detected = await fileTypeFromBuffer(buffer)
+  } catch (e) {
+    // file-type might throw on very small buffers or specific errors
+    // We treat this as "detection failed"
+  }
+
+  if (detected) {
+    // If it's a known binary format, check if it matches the requested type
+    if (type === 'image' && detected.mime.startsWith('image/')) return true
+    if (type === 'audio' && detected.mime.startsWith('audio/')) return true
+    if (type === 'video' && detected.mime.startsWith('video/')) return true
+
+    // For text/subtitle, ensure we didn't detect a binary media type
+    if (type === 'text' || type === 'subtitle') {
+      if (detected.mime.startsWith('image/') ||
+        detected.mime.startsWith('audio/') ||
+        detected.mime.startsWith('video/')) {
+        return false
+      }
+      // Allow xml, json, etc.
+      return true
+    }
+
+    // If we detected something but it didn't match the category
+    return false
+  }
+
+  // 2. If file-type returned undefined, it might be plain text
+  if (type === 'text' || type === 'subtitle') {
+    // Check if it's binary (contains null bytes)
+    // If it's binary, reject it (since we expect text)
+    if (isBinaryBuffer(nodeBuffer)) return false
+    return true
+  }
+
+  // For image/audio/video, if we couldn't detect type, reject it
+  return false
 }
 
 function getDirectoryForType(type: MediaType): string {
-  return type === "subtitle" ? "subtitles" : `${type}s`
+  if (type === "subtitle") return "subtitles"
+  if (type === "text") return "texts"
+  return `${type}s`
 }
 
 async function getFileSize(filePath: string): Promise<number> {
@@ -78,8 +134,8 @@ function formatFileSize(bytes: number): string {
 mediaRouter.post("/upload/:type", async (c) => {
   const params = c.req.param()
   const type = params.type as MediaType
-  if (!type || !["image", "audio", "video", "subtitle"].includes(type)) {
-    return c.json({ error: "Invalid media type. Use image, audio, video, or subtitle." }, 400)
+  if (!type || !["image", "audio", "video", "subtitle", "text"].includes(type)) {
+    return c.json({ error: "Invalid media type. Use image, audio, video, subtitle, or text." }, 400)
   }
 
   let formData: FormData
@@ -94,8 +150,9 @@ mediaRouter.post("/upload/:type", async (c) => {
     return c.json({ error: "Missing file field 'file'." }, 400)
   }
 
-  if (!isTypeMatch(file, type)) {
-    return c.json({ error: `Uploaded file does not match type '${type}'.` }, 400)
+  const isValid = await validateFileType(file, type)
+  if (!isValid) {
+    return c.json({ error: `Uploaded file does not match type '${type}' or is invalid.` }, 400)
   }
 
   const id = crypto.randomUUID()
@@ -183,7 +240,7 @@ mediaRouter.delete('/:id', async (c) => {
 })
 
 mediaRouter.post('/sync', async (c) => {
-  const types: MediaType[] = ['image', 'audio', 'video', 'subtitle']
+  const types: MediaType[] = ['image', 'audio', 'video', 'subtitle', 'text']
   const existing = await mediaStorage.getAll()
   const known = new Set(Object.values(existing).map((m) => m.url))
 
@@ -192,7 +249,8 @@ mediaRouter.post('/sync', async (c) => {
     image: 0,
     audio: 0,
     video: 0,
-    subtitle: 0
+    subtitle: 0,
+    text: 0
   }
 
   const config = loadConfig()
@@ -217,7 +275,8 @@ mediaRouter.post('/sync', async (c) => {
       const extSet = type === 'image' ? EXT_IMAGE
         : type === 'audio' ? EXT_AUDIO
           : type === 'video' ? EXT_VIDEO
-            : EXT_SUBTITLE
+            : type === 'subtitle' ? EXT_SUBTITLE
+              : EXT_TEXT
 
       if (!extSet.has(ext)) continue
 
@@ -242,8 +301,8 @@ mediaRouter.get('/data/:type', async (c) => {
   const params = c.req.param()
   const type = params.type as MediaType
 
-  if (!type || !["image", "audio", "video", "subtitle"].includes(type)) {
-    return c.json({ error: "Invalid media type. Use image, audio, video, or subtitle." }, 400)
+  if (!type || !["image", "audio", "video", "subtitle", "text"].includes(type)) {
+    return c.json({ error: "Invalid media type. Use image, audio, video, subtitle, or text." }, 400)
   }
 
   const data = await mediaStorage.getAll()
@@ -265,7 +324,7 @@ mediaRouter.get('/stats', async (c) => {
     byType: {} as Record<MediaType, { count: number; size: number; sizeFormatted: string }>
   }
 
-  const types: MediaType[] = ['image', 'audio', 'video', 'subtitle']
+  const types: MediaType[] = ['image', 'audio', 'video', 'subtitle', 'text']
 
   for (const type of types) {
     stats.byType[type] = { count: 0, size: 0, sizeFormatted: "0 B" }

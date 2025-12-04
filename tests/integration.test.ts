@@ -67,10 +67,11 @@ describe('Integration Tests', () => {
   })
 
   describe('Complete Media Workflow', () => {
+    const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
+
     it('should handle complete upload-retrieve-delete workflow', async () => {
       // 1. Upload an image
-      const imageContent = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) // PNG header
-      const file = new File([imageContent], 'workflow-test.png', { type: 'image/png' })
+      const file = new File([PNG_HEADER], 'workflow-test.png', { type: 'image/png' })
 
       const formData = new FormData()
       formData.append('file', file)
@@ -147,7 +148,8 @@ describe('Integration Tests', () => {
   describe('Multiple Media Types', () => {
     it('should handle different media types separately', async () => {
       // Upload one of each type in separate test
-      const imageFile = new File([new Uint8Array([137, 80, 78, 71])], 'test.png', { type: 'image/png' })
+      const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
+      const imageFile = new File([PNG_HEADER], 'test.png', { type: 'image/png' })
       const imageFormData = new FormData()
       imageFormData.append('file', imageFile)
 
@@ -173,10 +175,15 @@ describe('Integration Tests', () => {
   describe('Sync Functionality', () => {
     it('should sync existing files in upload directories', async () => {
       // Create some files directly in the upload directories
+      // We need valid headers for sync too if we validate on sync (which we do now)
+      const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
+      const MP4_HEADER = new Uint8Array([0, 0, 0, 32, 102, 116, 121, 112, 109, 112, 52, 50])
+      const MP3_HEADER = new Uint8Array([73, 68, 51, 3, 0, 0, 0, 0, 0, 0])
+
       const testFiles = [
-        { path: 'images/direct-image.jpg', content: 'fake image content' },
-        { path: 'videos/direct-video.mp4', content: 'fake video content' },
-        { path: 'audios/direct-audio.mp3', content: 'fake audio content' }
+        { path: 'images/direct-image.png', content: PNG_HEADER },
+        { path: 'videos/direct-video.mp4', content: MP4_HEADER },
+        { path: 'audios/direct-audio.mp3', content: MP3_HEADER }
       ]
 
       for (const file of testFiles) {
@@ -207,7 +214,8 @@ describe('Integration Tests', () => {
 
   describe('Error Handling', () => {
     it('should handle single upload correctly', async () => {
-      const file = new File(['test content'], 'test.png', { type: 'image/png' })
+      const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
+      const file = new File([PNG_HEADER], 'test.png', { type: 'image/png' })
       const formData = new FormData()
       formData.append('file', file)
       formData.append('name', 'Single Test')

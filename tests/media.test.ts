@@ -60,13 +60,18 @@ afterEach(async () => {
   await writeFile(TEST_MEDIA_FILE, '{}')
 })
 
+const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
+const MP4_HEADER = new Uint8Array([0, 0, 0, 32, 102, 116, 121, 112, 109, 112, 52, 50])
+const WAV_HEADER = new Uint8Array([82, 73, 70, 70, 36, 0, 0, 0, 87, 65, 86, 69])
+const VTT_HEADER = new Uint8Array([87, 69, 66, 86, 84, 84, 10, 10])
+
 describe('Media Router', () => {
 
   describe('POST /upload/:type', () => {
+
     it('should upload an image file successfully', async () => {
       // Create a mock image file
-      const imageContent = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) // PNG header
-      const file = new File([imageContent], 'test.png', { type: 'image/png' })
+      const file = new File([PNG_HEADER], 'test.png', { type: 'image/png' })
 
       const formData = new FormData()
       formData.append('file', file)
@@ -92,8 +97,7 @@ describe('Media Router', () => {
     })
 
     it('should upload a video file successfully', async () => {
-      const videoContent = new Uint8Array([0, 0, 0, 32, 102, 116, 121, 112]) // MP4 header
-      const file = new File([videoContent], 'test.mp4', { type: 'video/mp4' })
+      const file = new File([MP4_HEADER], 'test.mp4', { type: 'video/mp4' })
 
       const formData = new FormData()
       formData.append('file', file)
@@ -112,8 +116,7 @@ describe('Media Router', () => {
     })
 
     it('should upload an audio file successfully', async () => {
-      const audioContent = new Uint8Array([73, 68, 51]) // MP3 header
-      const file = new File([audioContent], 'test.mp3', { type: 'audio/mpeg' })
+      const file = new File([WAV_HEADER], 'test.wav', { type: 'audio/wav' })
 
       const formData = new FormData()
       formData.append('file', file)
@@ -128,12 +131,11 @@ describe('Media Router', () => {
 
       expect(response.status).toBe(201)
       expect(data.type).toBe('audio')
-      expect(data.url).toMatch(/^\/uploads\/audios\/[\w-]+\.mp3$/)
+      expect(data.url).toMatch(/^\/uploads\/audios\/[\w-]+\.wav$/)
     })
 
     it('should upload a subtitle file successfully', async () => {
-      const subtitleContent = new Uint8Array([87, 69, 66, 86, 84, 84]) // WEBVTT header
-      const file = new File([subtitleContent], 'test.vtt', { type: 'text/vtt' })
+      const file = new File([VTT_HEADER], 'test.vtt', { type: 'text/vtt' })
 
       const formData = new FormData()
       formData.append('file', file)
@@ -149,6 +151,25 @@ describe('Media Router', () => {
       expect(response.status).toBe(201)
       expect(data.type).toBe('subtitle')
       expect(data.url).toMatch(/^\/uploads\/subtitles\/[\w-]+\.vtt$/)
+    })
+
+    it('should upload a text file successfully', async () => {
+      const file = new File(['Some text content'], 'test.txt', { type: 'text/plain' })
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const request = new Request('http://localhost:3000/upload/text', {
+        method: 'POST',
+        body: formData
+      })
+
+      const response = await mediaRouter.request(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(201)
+      expect(data.type).toBe('text')
+      expect(data.url).toMatch(/^\/uploads\/texts\/[\w-]+\.txt$/)
     })
 
     it('should reject invalid media type', async () => {
@@ -199,7 +220,7 @@ describe('Media Router', () => {
     })
 
     it('should reject invalid metadata JSON', async () => {
-      const file = new File(['test'], 'test.png', { type: 'image/png' })
+      const file = new File([PNG_HEADER], 'test.png', { type: 'image/png' })
       const formData = new FormData()
       formData.append('file', file)
       formData.append('metadata', 'invalid json')
@@ -220,7 +241,7 @@ describe('Media Router', () => {
   describe('DELETE /:id', () => {
     it('should delete media successfully', async () => {
       // First upload a file
-      const file = new File(['test content'], 'test.png', { type: 'image/png' })
+      const file = new File([PNG_HEADER], 'test.png', { type: 'image/png' })
       const formData = new FormData()
       formData.append('file', file)
 
@@ -270,7 +291,7 @@ describe('Media Router', () => {
 
     it('should return media by type', async () => {
       // Upload an image first
-      const file = new File(['test'], 'test.png', { type: 'image/png' })
+      const file = new File([PNG_HEADER], 'test.png', { type: 'image/png' })
       const formData = new FormData()
       formData.append('file', file)
 
@@ -318,13 +339,14 @@ describe('Media Router', () => {
       expect(data.byType.video).toBeDefined()
       expect(data.byType.audio).toBeDefined()
       expect(data.byType.subtitle).toBeDefined()
+      expect(data.byType.text).toBeDefined()
     })
   })
 
   describe('GET /:id/size', () => {
     it('should return file size for existing media', async () => {
       // Upload a file first
-      const file = new File(['test content'], 'test.png', { type: 'image/png' })
+      const file = new File([PNG_HEADER], 'test.png', { type: 'image/png' })
       const formData = new FormData()
       formData.append('file', file)
 

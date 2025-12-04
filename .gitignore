@@ -3,3 +3,5 @@ node_modules/
 uploads/*
 media/*
 triggers/*.json
+package-lock.json
+bun.lock

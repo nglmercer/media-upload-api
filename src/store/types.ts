@@ -1,5 +1,5 @@
 // Tipos para el API de medios
-export type MediaType = "image" | "audio" | "video" | "subtitle"
+export type MediaType = "image" | "audio" | "video" | "subtitle" | "text"
 
 export interface MediaItem {
   id: string;
@@ -10,4 +10,12 @@ export interface MediaItem {
   metadata?: {
     [key: string]: any;
   };
+}
+
+export interface Draft {
+  id: string;
+  content: string;
+  mediaIds: string[];
+  createdAt: number;
+  updatedAt: number;
 }

@@ -102,8 +102,8 @@ describe('Media API with Fetch', () => {
 
     it('should upload and retrieve an image using fetch', async () => {
         // Create a mock image file
-        const imageContent = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) // PNG header
-        const file = new File([imageContent], 'test_fetch.png', { type: 'image/png' })
+        const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
+        const file = new File([PNG_HEADER], 'test_fetch.png', { type: 'image/png' })
 
         // Upload
         const uploaded = await api.uploadMedia('image', file, { source: 'fetch_test' });
@@ -126,7 +126,8 @@ describe('Media API with Fetch', () => {
 
     it('should delete media using fetch', async () => {
         // Upload first
-        const file = new File(['test'], 'delete_test.png', { type: 'image/png' });
+        const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
+        const file = new File([PNG_HEADER], 'delete_test.png', { type: 'image/png' });
         const uploaded = await api.uploadMedia('image', file);
 
         // Delete
@@ -139,7 +140,8 @@ describe('Media API with Fetch', () => {
     });
 
     it('should get stats using fetch', async () => {
-        const file = new File(['test'], 'stats_test.png', { type: 'image/png' });
+        const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
+        const file = new File([PNG_HEADER], 'stats_test.png', { type: 'image/png' });
         await api.uploadMedia('image', file);
 
         const stats = await api.getStats();
@@ -148,7 +150,8 @@ describe('Media API with Fetch', () => {
     });
 
     it('should get all media using fetch', async () => {
-        const file = new File(['test'], 'all_test.png', { type: 'image/png' });
+        const PNG_HEADER = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])
+        const file = new File([PNG_HEADER], 'all_test.png', { type: 'image/png' });
         const uploaded = await api.uploadMedia('image', file);
 
         const all = await api.getAllMedia();
