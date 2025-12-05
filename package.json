@@ -11,6 +11,7 @@
     "test:integration": "bun test tests/media.test.ts tests/integration.test.ts"
   },
   "dependencies": {
+    "ffmpeg-lib": "^1.1.5",
     "file-type": "^21.1.1",
     "hono": "^4.9.5",
     "json-obj-manager": "^1.4.5",

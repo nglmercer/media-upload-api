@@ -34,7 +34,7 @@ describe('ConfigManager', () => {
 
       const config = JSON.parse(readFileSync(configPath, 'utf8'))
       expect(config).toEqual({
-        port: 21100,
+        port: 3000,
         host: '0.0.0.0',
         uploadsDir: 'uploads',
         mediaFile: 'media/media.json'
@@ -58,7 +58,7 @@ describe('ConfigManager', () => {
     it('should load default config when no file exists', () => {
       const config = loadConfig()
       expect(config).toEqual({
-        port: 21100,
+        port: 3000,
         host: '0.0.0.0',
         uploadsDir: 'uploads',
         mediaFile: 'media/media.json'
@@ -91,7 +91,7 @@ describe('ConfigManager', () => {
       writeFileSync(configPath, JSON.stringify(configWithZeroPort))
 
       const config = loadConfig()
-      expect(config.port).toBe(21100) // Should use default
+      expect(config.port).toBe(3000) // Should use default
     })
 
     it('should handle invalid JSON gracefully', () => {
@@ -99,7 +99,7 @@ describe('ConfigManager', () => {
 
       const config = loadConfig()
       expect(config).toEqual({
-        port: 21100,
+        port: 3000,
         host: '0.0.0.0',
         uploadsDir: 'uploads',
         mediaFile: 'media/media.json'
@@ -143,7 +143,7 @@ describe('ConfigManager', () => {
       // Create initial config
       createConfigFile()
       let config = loadConfig()
-      expect(config.port).toBe(21100)
+      expect(config.port).toBe(3000)
 
       // Update config
       saveConfig({ port: 8000 })

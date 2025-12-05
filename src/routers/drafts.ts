@@ -1,8 +1,9 @@
 import { Hono } from "hono"
 import { draftStore } from "../store/draftStore"
-import type { Draft } from "../store/types"
-import { DraftStatus } from "../store/types"
+import type { Draft, ProcessingConfig } from "../store/types"
+import { DraftStatus, ProcessingStatus } from "../store/types"
 import { draftSchema, draftUpdateSchema } from "../validators/draft"
+import { processingService } from "../services/processingService"
 
 const draftsRouter = new Hono()
 
@@ -144,6 +145,100 @@ draftsRouter.get('/meta/statuses', async (c) => {
             { value: DraftStatus.ARCHIVED, label: 'Archived' }
         ]
     })
+})
+
+// Endpoint para iniciar procesamiento de un draft
+draftsRouter.post('/:id/process', async (c) => {
+    const id = c.req.param('id')
+    const draft = await draftStore.get(id)
+
+    if (!draft) {
+        return c.json({ error: 'Draft not found' }, 404)
+    }
+
+    // Verificar que el draft no esté ya en procesamiento
+    if (draft.processingStatus === ProcessingStatus.PROCESSING || draft.processingStatus === ProcessingStatus.QUEUED) {
+        return c.json({ error: 'Draft is already being processed' }, 400)
+    }
+
+    let body
+    try {
+        body = await c.req.json()
+    } catch {
+        return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    // Validar configuración de procesamiento
+    const config: ProcessingConfig = body
+    if (!config.videoFile || !config.videoFile.id || !config.videoFile.url) {
+        return c.json({ error: 'Video file is required' }, 400)
+    }
+
+    try {
+        await processingService.addToQueue(id, config)
+        
+        // Obtener el draft actualizado
+        const updatedDraft = await draftStore.get(id)
+        return c.json({
+            message: 'Draft added to processing queue',
+            draft: updatedDraft
+        })
+    } catch (error) {
+        return c.json({ 
+            error: 'Failed to add draft to processing queue',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        }, 500)
+    }
+})
+
+// Endpoint para obtener estado del procesamiento
+draftsRouter.get('/:id/processing-status', async (c) => {
+    const id = c.req.param('id')
+    const draft = await draftStore.get(id)
+
+    if (!draft) {
+        return c.json({ error: 'Draft not found' }, 404)
+    }
+
+    return c.json({
+        draftId: id,
+        processingStatus: draft.processingStatus,
+        processingResult: draft.processingResult,
+        processingError: draft.processingError,
+        queuedAt: draft.queuedAt,
+        startedProcessingAt: draft.startedProcessingAt,
+        completedProcessingAt: draft.completedProcessingAt
+    })
+})
+
+// Endpoint para obtener estado general de la cola
+draftsRouter.get('/queue/status', async (c) => {
+    const queueStatus = processingService.getQueueStatus()
+    return c.json(queueStatus)
+})
+
+// Endpoint para obtener drafts en cola
+draftsRouter.get('/queue/items', async (c) => {
+    const statusParam = c.req.query('status')
+    let drafts = Object.values(await draftStore.getAll())
+
+    // Filtrar solo drafts con configuración de procesamiento
+    drafts = drafts.filter(d => d.processingConfig)
+
+    // Filtrar por estado de procesamiento si se proporciona
+    if (statusParam) {
+        drafts = drafts.filter(d => d.processingStatus === statusParam)
+    }
+
+    return c.json(drafts.map(d => ({
+        id: d.id,
+        processingStatus: d.processingStatus,
+        queuedAt: d.queuedAt,
+        startedProcessingAt: d.startedProcessingAt,
+        completedProcessingAt: d.completedProcessingAt,
+        processingError: d.processingError,
+        processingResult: d.processingResult
+    })))
 })
 
 export { draftsRouter }
