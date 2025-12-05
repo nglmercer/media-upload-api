@@ -11,11 +11,24 @@ export interface MediaItem {
     [key: string]: any;
   };
 }
+// Draft status enum
+export enum DraftStatus {
+  DRAFT = 0,
+  IN_REVIEW = 1,
+  SCHEDULED = 2,
+  PUBLISHED = 3,
+  ARCHIVED = 4
+}
 
 export interface Draft {
-  id: string;
-  content: string;
-  mediaIds: string[];
-  createdAt: number;
-  updatedAt: number;
+  id: string
+  content: string
+  mediaIds: string[]
+  tags: string[]
+  status: DraftStatus
+  createdAt: number
+  updatedAt: number
 }
+
+export type DraftInput = Omit<Draft, 'id' | 'createdAt' | 'updatedAt'>
+export type DraftUpdate = Partial<DraftInput>

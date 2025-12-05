@@ -1,14 +1,35 @@
 import { Hono } from "hono"
 import { draftStore } from "../store/draftStore"
 import type { Draft } from "../store/types"
+import { DraftStatus } from "../store/types"
 import { draftSchema, draftUpdateSchema } from "../validators/draft"
 
 const draftsRouter = new Hono()
 
-// Get all drafts
+// Get all drafts (con filtros opcionales por status y tags)
 draftsRouter.get('/', async (c) => {
-    const drafts = await draftStore.getAll()
-    return c.json(Object.values(drafts))
+    const statusParam = c.req.query('status')
+    const tagsParam = c.req.query('tags')
+
+    let drafts = Object.values(await draftStore.getAll())
+
+    // Filtrar por status si se proporciona
+    if (statusParam !== undefined) {
+        const status = parseInt(statusParam, 10)
+        if (!isNaN(status) && status in DraftStatus) {
+            drafts = drafts.filter(d => d.status === status)
+        }
+    }
+
+    // Filtrar por tags si se proporciona (formato: ?tags=tag1,tag2)
+    if (tagsParam) {
+        const tags = tagsParam.split(',').map(t => t.trim())
+        drafts = drafts.filter(d =>
+            tags.some(tag => d.tags.includes(tag))
+        )
+    }
+
+    return c.json(drafts)
 })
 
 // Get single draft
@@ -33,8 +54,12 @@ draftsRouter.post('/', async (c) => {
     }
 
     const result = draftSchema.safeParse(body)
+
     if (!result.success) {
-        return c.json({ error: result.error.issues }, 400)
+        return c.json({
+            error: 'Validation failed',
+            details: result.error.issues
+        }, 400)
     }
 
     const data = result.data
@@ -45,6 +70,8 @@ draftsRouter.post('/', async (c) => {
         id,
         content: data.content || '',
         mediaIds: data.mediaIds || [],
+        tags: data.tags || [],
+        status: data.status || DraftStatus.DRAFT,
         createdAt: now,
         updatedAt: now
     }
@@ -70,8 +97,12 @@ draftsRouter.put('/:id', async (c) => {
     }
 
     const result = draftUpdateSchema.safeParse(body)
+
     if (!result.success) {
-        return c.json({ error: result.error.issues }, 400)
+        return c.json({
+            error: 'Validation failed',
+            details: result.error.issues
+        }, 400)
     }
 
     const data = result.data
@@ -80,6 +111,8 @@ draftsRouter.put('/:id', async (c) => {
         ...existing,
         content: data.content ?? existing.content,
         mediaIds: data.mediaIds ?? existing.mediaIds,
+        tags: data.tags ?? existing.tags,
+        status: data.status ?? existing.status,
         updatedAt: Date.now()
     }
 
@@ -98,6 +131,19 @@ draftsRouter.delete('/:id', async (c) => {
 
     await draftStore.delete(id)
     return c.json({ message: 'Draft deleted successfully' })
+})
+
+// Endpoint adicional: Get all available statuses
+draftsRouter.get('/meta/statuses', async (c) => {
+    return c.json({
+        statuses: [
+            { value: DraftStatus.DRAFT, label: 'Draft' },
+            { value: DraftStatus.IN_REVIEW, label: 'In Review' },
+            { value: DraftStatus.SCHEDULED, label: 'Scheduled' },
+            { value: DraftStatus.PUBLISHED, label: 'Published' },
+            { value: DraftStatus.ARCHIVED, label: 'Archived' }
+        ]
+    })
 })
 
 export { draftsRouter }

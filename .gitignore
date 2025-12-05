@@ -6,3 +6,4 @@ drafts/*
 triggers/*.json
 package-lock.json
 bun.lock
+config.json
