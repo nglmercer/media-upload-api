@@ -25,6 +25,25 @@ app.get('/', (c) => {
 })
 
 // Serve uploaded files
+app.use('/uploads/*', async (c, next) => {
+  await next()
+  const path = c.req.path
+  if (path.endsWith('.m3u8') || path.endsWith('.ts')) {
+    const newHeaders = new Headers(c.res.headers)
+
+    if (path.endsWith('.m3u8')) {
+      newHeaders.set('Content-Type', 'application/vnd.apple.mpegurl')
+    } else if (path.endsWith('.ts')) {
+      newHeaders.set('Content-Type', 'video/MP2T')
+    }
+
+    c.res = new Response(c.res.body, {
+      status: c.res.status,
+      statusText: c.res.statusText,
+      headers: newHeaders
+    })
+  }
+})
 app.use('/uploads/*', serveStatic({ root: './' }))
 
 // Mount media routes

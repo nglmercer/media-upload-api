@@ -25,6 +25,9 @@ const EXT_BY_MIME: Record<string, string> = {
   "video/mp4": ".mp4",
   "video/webm": ".webm",
   "video/ogg": ".ogv",
+  "application/vnd.apple.mpegurl": ".m3u8",
+  "application/x-mpegURL": ".m3u8",
+  "video/MP2T": ".ts",
   // subtitle
   "text/vtt": ".vtt",
   "application/x-subrip": ".srt",
@@ -42,7 +45,7 @@ const EXT_BY_MIME: Record<string, string> = {
 // Validation sets for file extensions
 const EXT_IMAGE = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"])
 const EXT_AUDIO = new Set([".mp3", ".wav", ".ogg", ".weba"])
-const EXT_VIDEO = new Set([".mp4", ".webm", ".ogv"])
+const EXT_VIDEO = new Set([".mp4", ".webm", ".ogv", ".m3u8", ".ts"])
 const EXT_SUBTITLE = new Set([".vtt", ".srt", ".ssa", ".ass", ".sub"])
 const EXT_TEXT = new Set([".txt", ".md", ".json", ".xml", ".csv", ".log"])
 
@@ -79,7 +82,11 @@ async function validateFileType(file: File, type: MediaType): Promise<boolean> {
     // If it's a known binary format, check if it matches the requested type
     if (type === 'image' && detected.mime.startsWith('image/')) return true
     if (type === 'audio' && detected.mime.startsWith('audio/')) return true
-    if (type === 'video' && detected.mime.startsWith('video/')) return true
+    if (type === 'video') {
+      if (detected.mime.startsWith('video/')) return true
+      // Support for .ts files which are often detected as video/mp2t
+      if (detected.mime === 'video/mp2t') return true
+    }
 
     // For text/subtitle, ensure we didn't detect a binary media type
     if (type === 'text' || type === 'subtitle') {
@@ -102,6 +109,24 @@ async function validateFileType(file: File, type: MediaType): Promise<boolean> {
     // If it's binary, reject it (since we expect text)
     if (isBinaryBuffer(nodeBuffer)) return false
     return true
+  }
+
+  // Special handling for m3u8 (text-based but classified as video here)
+  if (type === 'video') {
+    const ext = extFromFile(file)
+    if (ext === '.m3u8') {
+      // m3u8 should be text-based
+      if (isBinaryBuffer(nodeBuffer)) return false
+      // basic content check
+      const content = nodeBuffer.toString('utf8', 0, Math.min(nodeBuffer.length, 50))
+      if (content.includes('#EXTM3U')) return true
+    }
+
+    // Special handling for .ts (MPEG-TS) if file-type failed
+    if (ext === '.ts') {
+      // MPEG-TS packets start with 0x47
+      if (nodeBuffer.length > 0 && nodeBuffer[0] === 0x47) return true
+    }
   }
 
   // For image/audio/video, if we couldn't detect type, reject it
