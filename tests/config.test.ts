@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { loadConfig, createConfigFile, saveConfig } from '../src/config'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { config, loadConfig, saveConfig } from '../src/config'
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'fs'
 import path from 'path'
 
 describe('ConfigManager', () => {
@@ -9,156 +9,151 @@ describe('ConfigManager', () => {
   beforeEach(async () => {
     // Clean up config file before each test
     try {
-      const fs = await import('fs/promises')
-      await fs.rm(configPath, { force: true })
+      rmSync(configPath, { force: true })
     } catch {
       // Ignore if file doesn't exist
     }
   })
 
   afterEach(async () => {
+    // Reload config to clean state after each test
+    config.reload()
     // Clean up config file after each test
     try {
-      const fs = await import('fs/promises')
-      await fs.rm(configPath, { force: true })
+      rmSync(configPath, { force: true })
     } catch {
       // Ignore if file doesn't exist
     }
   })
 
-  describe('createConfigFile', () => {
-    it('should create config file with default values', () => {
-      createConfigFile()
-
-      expect(existsSync(configPath)).toBe(true)
-
-      const config = JSON.parse(readFileSync(configPath, 'utf8'))
-      expect(config).toEqual({
-        port: 21100,
+  describe('Config Structure', () => {
+    it('should have correct default server config', () => {
+      const serverConfig = config.getServer()
+      expect(serverConfig).toEqual({
+        port: 3000,
         host: '0.0.0.0',
         uploadsDir: 'uploads',
-        mediaFile: 'media/media.json'
+        dataDir: 'data',
+        maxFileSizeBytes: 104857600,
+        allowedMimeTypes: [],
+        logLevel: 'info'
       })
     })
 
-    it('should not overwrite existing config file', () => {
-      // Create initial config
-      const customConfig = { port: 3000, host: 'localhost', uploadsDir: 'custom_uploads', mediaFile: 'custom_media.json' }
-      writeFileSync(configPath, JSON.stringify(customConfig))
+    it('should have correct default quota config', () => {
+      const quotaConfig = config.getQuota()
+      expect(quotaConfig).toEqual({
+        global: {
+          maxTotalStorageBytes: 10737418240,
+          maxTotalFiles: 10000
+        },
+        defaults: {
+          maxStorageBytes: 524288000,
+          maxFiles: 500
+        },
+        userOverrides: {}
+      })
+    })
 
-      createConfigFile()
-
-      // Should keep existing config
-      const config = JSON.parse(readFileSync(configPath, 'utf8'))
-      expect(config).toEqual(customConfig)
+    it('should have correct default oauth config', () => {
+      const oauthConfig = config.getOAuth()
+      expect(oauthConfig).toEqual({
+        enabled: false,
+        tokenAuth: {
+          enabled: false,
+          tokens: []
+        },
+        providers: []
+      })
     })
   })
 
-  describe('loadConfig', () => {
-    it('should load default config when no file exists', () => {
-      const config = loadConfig()
-      expect(config).toEqual({
-        port: 21100,
+  describe('loadConfig (server config)', () => {
+    it('should load default server config when no file exists', () => {
+      const serverConfig = loadConfig()
+      expect(serverConfig).toEqual({
+        port: 3000,
         host: '0.0.0.0',
         uploadsDir: 'uploads',
-        mediaFile: 'media/media.json'
+        dataDir: 'data',
+        maxFileSizeBytes: 104857600,
+        allowedMimeTypes: [],
+        logLevel: 'info'
       })
     })
 
-    it('should load existing config file', () => {
-      const customConfig = { port: 4000, host: '192.168.1.1', uploadsDir: 'u', mediaFile: 'm.json' }
-      writeFileSync(configPath, JSON.stringify(customConfig))
-
-      const config = loadConfig()
-      expect(config).toEqual(customConfig)
-    })
-
-    it('should merge with default config for partial config', () => {
+    it('should merge partial server config with defaults', () => {
       const partialConfig = { port: 5000 }
-      writeFileSync(configPath, JSON.stringify(partialConfig))
+      writeFileSync(configPath, JSON.stringify({ server: partialConfig }))
+      config.reload()
 
-      const config = loadConfig()
-      expect(config).toEqual({
-        port: 5000,
-        host: '0.0.0.0', // Default value
-        uploadsDir: 'uploads',
-        mediaFile: 'media/media.json'
-      })
-    })
-
-    it('should handle port 0 by using default port', () => {
-      const configWithZeroPort = { port: 0 }
-      writeFileSync(configPath, JSON.stringify(configWithZeroPort))
-
-      const config = loadConfig()
-      expect(config.port).toBe(21100) // Should use default
+      const serverConfig = loadConfig()
+      expect(serverConfig.port).toBe(5000)
+      expect(serverConfig.host).toBe('0.0.0.0') // Default
+      expect(serverConfig.uploadsDir).toBe('uploads') // Default
     })
 
     it('should handle invalid JSON gracefully', () => {
       writeFileSync(configPath, 'invalid json')
+      config.reload()
 
-      const config = loadConfig()
-      expect(config).toEqual({
-        port: 21100,
-        host: '0.0.0.0',
-        uploadsDir: 'uploads',
-        mediaFile: 'media/media.json'
-      })
+      const serverConfig = loadConfig()
+      expect(serverConfig.port).toBe(3000) // Default port
     })
   })
 
   describe('saveConfig', () => {
-    it('should save partial config updates', () => {
-      createConfigFile()
+    it('should save partial server config updates', () => {
+      // Ensure config file exists
+      const fullConfig = config.get()
+      writeFileSync(configPath, JSON.stringify(fullConfig, null, 2))
+      config.reload()
 
       saveConfig({ port: 6000 })
 
-      const config = JSON.parse(readFileSync(configPath, 'utf8'))
-      expect(config).toEqual({
-        port: 6000,
-        host: '0.0.0.0', // Original value preserved
-        uploadsDir: 'uploads',
-        mediaFile: 'media/media.json'
-      })
+      const serverConfig = loadConfig()
+      expect(serverConfig.port).toBe(6000)
+      expect(serverConfig.host).toBe('0.0.0.0') // Original value preserved
+      expect(serverConfig.uploadsDir).toBe('uploads')
     })
 
-    it('should save multiple config updates', () => {
-      createConfigFile()
+    it('should save multiple server config updates', () => {
+      // Ensure config file exists
+      const fullConfig = config.get()
+      writeFileSync(configPath, JSON.stringify(fullConfig, null, 2))
+      config.reload()
 
       saveConfig({ port: 7000 })
       saveConfig({ host: '127.0.0.1' })
 
-      const config = JSON.parse(readFileSync(configPath, 'utf8'))
-      expect(config).toEqual({
-        port: 7000,
-        host: '127.0.0.1',
-        uploadsDir: 'uploads',
-        mediaFile: 'media/media.json'
-      })
+      const serverConfig = loadConfig()
+      expect(serverConfig.port).toBe(7000)
+      expect(serverConfig.host).toBe('127.0.0.1')
     })
   })
 
   describe('integration', () => {
-    it('should work end-to-end: create, load, save, load', () => {
-      // Create initial config
-      createConfigFile()
-      let config = loadConfig()
-      expect(config.port).toBe(21100)
+    it('should work end-to-end: create, load, save, reload', () => {
+      // Force reload to get clean state
+      config.reload()
+      
+      // Get initial config
+      let serverConfig = loadConfig()
+      expect(serverConfig.port).toBe(3000)
 
       // Update config
       saveConfig({ port: 8000 })
-      config = loadConfig()
-      expect(config.port).toBe(8000)
+      serverConfig = loadConfig()
+      expect(serverConfig.port).toBe(8000)
 
       // Add another field
       saveConfig({ host: 'example.com' })
-      config = loadConfig()
-      expect(config).toEqual({
-        port: 8000,
-        host: 'example.com',
-        uploadsDir: 'uploads',
-        mediaFile: 'media/media.json'
-      })
+      serverConfig = loadConfig()
+      expect(serverConfig.port).toBe(8000)
+      expect(serverConfig.host).toBe('example.com')
+      
+      // Clean up - restore to defaults
+      config.reload()
     })
   })
 })

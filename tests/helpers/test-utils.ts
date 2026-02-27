@@ -1,48 +1,79 @@
 import { Hono } from 'hono'
-import { mediaRouter } from '../../src/routers/media'
+import { filesRouter } from '../../src/routers/files'
 
-import { createConfigFile } from '../../src/config'
+import { config } from '../../src/config'
 import path from 'path'
-import { mkdir, rm } from 'fs/promises'
-import { DataStorage } from 'json-obj-manager'
-import { JSONFileAdapter } from 'json-obj-manager/node'
+import { mkdir, rm, writeFile } from 'fs/promises'
+import { JsonManager } from 'json-obj-manager'
+import { FileAdapter } from 'json-obj-manager/node'
 
 export async function createTestApp(): Promise<{ app: Hono; testStorage: any; originalStorage: any }> {
-  // Create a fresh media storage instance for each test
-  const testMediaPath = path.join(process.cwd(), 'media', 'test-media.json')
-  const testStorage = new DataStorage(
-    new JSONFileAdapter(testMediaPath)
-  )
+  // Create a fresh file storage instance for each test
+  const testMediaPath = path.join(process.cwd(), 'data', 'test-files.json')
+  const testAdapter = new FileAdapter<any>(testMediaPath)
+  const testStorage = new JsonManager<any>({
+    adapter: testAdapter
+  })
 
-  // Override global mediaStorage temporarily
-  const { mediaStorage } = await import('../../src/store/mediaStore')
-  const originalStorage = mediaStorage
+  // Note: We can't easily override the internal storage in the new structure
+  // Tests would need to use the app directly
 
   const app = new Hono()
-  app.route('/api/media', mediaRouter)
-  app.get('/api/media/data', async (c) => {
+  app.route('/api/files', filesRouter)
+  app.get('/api/files/data', async (c) => {
     const data = await testStorage.getAll()
     return c.json(data)
   })
 
-  return { app, testStorage, originalStorage }
+  return { app, testStorage, originalStorage: null }
 }
 
 export async function setupTestEnvironment(): Promise<void> {
   // Clean up everything first
   await cleanupTestEnvironment()
 
-  // Setup config
-  createConfigFile()
+  // Setup config - create default config file
+  const configPath = path.join(process.cwd(), 'config.json')
+  const defaultConfig = {
+    server: {
+      port: 3000,
+      host: '0.0.0.0',
+      uploadsDir: 'uploads',
+      dataDir: 'data',
+      maxFileSizeBytes: 104857600,
+      allowedMimeTypes: [],
+      logLevel: 'info'
+    },
+    oauth: {
+      enabled: false,
+      tokenAuth: {
+        enabled: false,
+        tokens: []
+      },
+      providers: []
+    },
+    quota: {
+      global: {
+        maxTotalStorageBytes: 10737418240,
+        maxTotalFiles: 10000
+      },
+      defaults: {
+        maxStorageBytes: 524288000,
+        maxFiles: 500
+      },
+      userOverrides: {}
+    }
+  }
+  await writeFile(configPath, JSON.stringify(defaultConfig, null, 2))
 
   // Create necessary directories
   const testDirs = [
     'uploads',
     'uploads/images',
     'uploads/videos',
-    'uploads/audios',
-    'uploads/subtitles',
-    'media'
+    'uploads/audio',
+    'uploads/documents',
+    'data'
   ]
   for (const dir of testDirs) {
     await mkdir(path.join(process.cwd(), dir), { recursive: true })
@@ -50,7 +81,7 @@ export async function setupTestEnvironment(): Promise<void> {
 }
 
 export async function cleanupTestEnvironment(): Promise<void> {
-  const testDirs = ['uploads', 'media']
+  const testDirs = ['uploads', 'data']
   for (const dir of testDirs) {
     try {
       await rm(path.join(process.cwd(), dir), { recursive: true, force: true })
