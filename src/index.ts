@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
-import { mediaStorage } from './store/mediaStore'
 import { upgradeWebSocket, websocket } from 'hono/bun'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
@@ -8,8 +7,16 @@ import { ServerWebSocket } from 'bun';
 import { io, type WebSocketData } from './websocket-adapter';
 import { config, loadConfig, createConfigFile, saveConfig } from './config'
 import { authMiddleware } from './middleware/auth'
+
+// Import routers
 import { configRouter } from './routers/config'
 import { authRouter } from './routers/auth'
+import { filesRouter } from './routers/files'
+import { quotaRouter } from './routers/quota'
+
+// Initialize file store
+import { initFileStore } from './store/fileStore'
+initFileStore()
 
 // Create default config file if it doesn't exist
 createConfigFile()
@@ -37,13 +44,11 @@ app.route('/api/config', configRouter)
 // Mount auth routes
 app.route('/api/auth', authRouter)
 
-// Media routes (legacy - to be replaced with files router)
-import { mediaRouter } from './routers/media'
-app.route('/api/media', mediaRouter)
+// Mount file routes
+app.route('/api/files', filesRouter)
 
-// Drafts routes (to be removed)
-import { draftsRouter } from './routers/drafts'
-app.route('/api/drafts', draftsRouter)
+// Mount quota routes
+app.route('/api/quota', quotaRouter)
 
 // WebSocket handling
 io.on('connection', (socket) => {
