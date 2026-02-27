@@ -248,8 +248,10 @@ export class FileClient {
     }
   }
 
-  getUrl(id: string): string {
-    return `${this.client.config.baseUrl}/uploads/${id}`;
+  getUrl(file: FileItem): string {
+    // Use the URL directly from the server response
+    // The server returns URLs like /uploads/{category}/{filename}
+    return `${this.client.config.baseUrl}${file.url}`;
   }
 
   getCategories(): Promise<{ categories: string[]; securityCategories: string[] }> {

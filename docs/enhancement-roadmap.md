@@ -1273,8 +1273,9 @@ export class FileClient {
     return response.blob();
   }
   
-  getUrl(id: string): string {
-    return `${this.client.config.baseUrl}/uploads/files/${id}`;
+  getUrl(file: FileItem): string {
+    // Use the URL directly from the server response
+    return `${this.client.config.baseUrl}${file.url}`;
   }
 }
 
