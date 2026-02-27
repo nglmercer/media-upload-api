@@ -1,5 +1,5 @@
-import { DataStorage } from 'json-obj-manager';
-import { JSONFileAdapter } from 'json-obj-manager/node';
+import { JsonManager, JsonObjManager } from 'json-obj-manager';
+import { FileAdapter } from 'json-obj-manager/node';
 import path from 'path';
 import type { MediaType, MediaItem } from './types';
 import { loadConfig } from '../config';
@@ -10,13 +10,13 @@ const MediaPath = path.isAbsolute(config.mediaFile)
   : path.join(process.cwd(), config.mediaFile);
 
 class ProxyStorage {
-  private _storage: DataStorage<MediaItem>;
+  private _storage: JsonObjManager<MediaItem>;
 
-  constructor(storage: DataStorage<MediaItem>) {
+  constructor(storage: JsonObjManager<MediaItem>) {
     this._storage = storage;
   }
 
-  setTarget(storage: DataStorage<MediaItem>) {
+  setTarget(storage: JsonObjManager<MediaItem>) {
     this._storage = storage;
   }
 
@@ -37,10 +37,12 @@ class ProxyStorage {
   }
 }
 
-const initialStorage = new DataStorage<MediaItem>(new JSONFileAdapter(MediaPath));
+const initialStorage = new JsonManager<MediaItem>({
+  adapter: new FileAdapter(MediaPath)
+});
 export const mediaStorage = new ProxyStorage(initialStorage);
 
-export function setMediaStorage(storage: DataStorage<MediaItem>) {
+export function setMediaStorage(storage: JsonObjManager<MediaItem>) {
   mediaStorage.setTarget(storage);
 }
 

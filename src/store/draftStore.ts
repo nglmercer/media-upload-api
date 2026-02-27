@@ -1,11 +1,9 @@
-import { DataStorage } from "json-obj-manager"
-import { JSONFileAdapter } from "json-obj-manager/node"
+import { JsonManager, JsonObjManager } from "json-obj-manager"
+import { FileAdapter } from "json-obj-manager/node"
 import path from "path"
 import { loadConfig } from "../config"
 import type { Draft } from "./types"
-
-let draftStorage: DataStorage<Draft>
-
+let JsonObj: JsonObjManager<Draft>;
 // Initialize storage
 export function initDraftStore() {
     const config = loadConfig()
@@ -13,26 +11,31 @@ export function initDraftStore() {
     // Use a separate file for drafts, e.g., drafts.json in the same directory as media.json
     const draftsFile = path.join(path.dirname(mediaFile), 'drafts.json')
 
-    const adapter = new JSONFileAdapter<Draft>(draftsFile)
-    draftStorage = new DataStorage<Draft>(adapter)
+    const adapter = new FileAdapter<Draft>(draftsFile)
+    const draftStorage = new JsonManager<Draft>({
+        adapter
+    })
+    JsonObj = draftStorage
+    return draftStorage
 }
 
 // Helper to ensure storage is initialized
 function getStorage() {
-    if (!draftStorage) {
-        initDraftStore()
+    if (!JsonObj) {
+        JsonObj = initDraftStore()
     }
-    return draftStorage
+    return JsonObj
 }
 
 export const draftStore = {
     async getAll(): Promise<Record<string, Draft>> {
-        return getStorage().getAll()
+        const result = await getStorage().getAll()
+        return result as Record<string, Draft>
     },
 
     async get(id: string): Promise<Draft | undefined> {
         const item = await getStorage().load(id)
-        return item ?? undefined
+        return (item as Draft) ?? undefined
     },
 
     async save(id: string, draft: Draft): Promise<void> {
@@ -45,6 +48,6 @@ export const draftStore = {
 }
 
 // Allow overriding storage for tests
-export function setDraftStorage(storage: DataStorage<Draft>) {
-    draftStorage = storage
+export function setDraftStorage(storage: JsonObjManager<Draft>) {
+    JsonObj = storage
 }
