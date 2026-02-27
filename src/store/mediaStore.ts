@@ -2,12 +2,10 @@ import { JsonManager, JsonObjManager } from 'json-obj-manager';
 import { FileAdapter } from 'json-obj-manager/node';
 import path from 'path';
 import type { MediaType, MediaItem } from './types';
-import { loadConfig } from '../config';
+import { config } from '../config';
 
-const config = loadConfig();
-const MediaPath = path.isAbsolute(config.mediaFile)
-  ? config.mediaFile
-  : path.join(process.cwd(), config.mediaFile);
+const serverConfig = config.getServer();
+const MediaPath = path.join(serverConfig.dataDir, 'media.json');
 
 class ProxyStorage {
   private _storage: JsonObjManager<MediaItem>;

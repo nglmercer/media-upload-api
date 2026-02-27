@@ -1,18 +1,19 @@
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
-import { mediaRouter } from './routers/media'
-import { draftsRouter } from './routers/drafts'
 import { mediaStorage } from './store/mediaStore'
 import { upgradeWebSocket, websocket } from 'hono/bun'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { ServerWebSocket } from 'bun';
 import { io, type WebSocketData } from './websocket-adapter';
-import { emitter } from './Emitter';
-import { loadConfig, createConfigFile, saveConfig } from './config'
+import { config, loadConfig, createConfigFile, saveConfig } from './config'
+import { authMiddleware } from './middleware/auth'
+import { configRouter } from './routers/config'
+import { authRouter } from './routers/auth'
 
+// Create default config file if it doesn't exist
 createConfigFile()
-const config = loadConfig()
+
 const app = new Hono()
 
 app.use(logger())
@@ -21,18 +22,30 @@ app.use(cors({
 }))
 
 app.get('/', (c) => {
-  return c.text('Hello Hono!')
+  return c.text('Media Upload API')
 })
 
 // Serve uploaded files
 app.use('/uploads/*', serveStatic({ root: './' }))
 
-// Mount media routes
+// Apply auth middleware globally
+app.use('/*', authMiddleware)
+
+// Mount config routes (public + admin)
+app.route('/api/config', configRouter)
+
+// Mount auth routes
+app.route('/api/auth', authRouter)
+
+// Media routes (legacy - to be replaced with files router)
+import { mediaRouter } from './routers/media'
 app.route('/api/media', mediaRouter)
+
+// Drafts routes (to be removed)
+import { draftsRouter } from './routers/drafts'
 app.route('/api/drafts', draftsRouter)
 
-
-
+// WebSocket handling
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`)
   socket.on('disconnect', () => {
@@ -45,31 +58,29 @@ app.get(
   upgradeWebSocket((c) => {
     return {
       onOpen: (event, ws) => {
-        // Usamos ws.raw para pasar el objeto nativo de Bun al adaptador
         io.handleOpen(ws.raw as ServerWebSocket<WebSocketData>);
       },
-
       onMessage: (event, ws) => {
-        // Usamos ws.raw aquí también
         io.handleMessage(ws.raw as ServerWebSocket<WebSocketData>, event.data.toString());
       },
       onClose: (event, ws) => {
-        // Y aquí también
         io.handleClose(ws.raw as ServerWebSocket<WebSocketData>, event.code, event.reason);
       },
       onError: (event, ws) => {
-        console.error('Error de WebSocket:', event)
-        // Opcional: notificar al adaptador si tienes un manejador de errores
-        // io.handleError(ws.raw, event.error);
+        console.error('WebSocket error:', event)
       }
     }
   })
 )
 
+// Get server config
+const serverConfig = loadConfig()
+
+// Start server
 try {
   const server = Bun.serve({
     fetch: app.fetch,
-    port: config.port,
+    port: serverConfig.port,
     websocket,
   });
   console.log(`Server running on port ${server.port}`);

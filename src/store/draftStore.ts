@@ -1,15 +1,15 @@
 import { JsonManager, JsonObjManager } from "json-obj-manager"
 import { FileAdapter } from "json-obj-manager/node"
 import path from "path"
-import { loadConfig } from "../config"
+import { config } from "../config"
 import type { Draft } from "./types"
+
 let JsonObj: JsonObjManager<Draft>;
+
 // Initialize storage
 export function initDraftStore() {
-    const config = loadConfig()
-    const mediaFile = config.mediaFile
-    // Use a separate file for drafts, e.g., drafts.json in the same directory as media.json
-    const draftsFile = path.join(path.dirname(mediaFile), 'drafts.json')
+    const serverConfig = config.getServer();
+    const draftsFile = path.join(serverConfig.dataDir, 'drafts.json')
 
     const adapter = new FileAdapter<Draft>(draftsFile)
     const draftStorage = new JsonManager<Draft>({
