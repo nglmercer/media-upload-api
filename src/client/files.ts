@@ -54,12 +54,12 @@ export class FileClient {
   ): Promise<FileItem> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      const url = `${(this.client as any).config.baseUrl}/api/files`;
+      const url = `${this.client.config.baseUrl}/api/files`;
 
       xhr.open('POST', url);
 
-      if ((this.client as any).config.token) {
-        xhr.setRequestHeader('X-Auth-Token', (this.client as any).config.token);
+      if (this.client.config.token) {
+        xhr.setRequestHeader('X-Auth-Token', this.client.config.token);
       }
 
       xhr.upload.addEventListener('progress', (e) => {
@@ -102,8 +102,8 @@ export class FileClient {
     const fileStats = await stat(filePath);
     const fileSize = fileStats.size;
     
-    const baseUrl = (this.client as any).config.baseUrl;
-    const token = (this.client as any).config.token;
+    const baseUrl = this.client.config.baseUrl;
+    const token = this.client.config.token;
     const url = `${baseUrl}/api/files`;
     
     const fileBuffer = await readFile(filePath);
@@ -170,8 +170,8 @@ export class FileClient {
   }
 
   async download(id: string, options?: DownloadOptions): Promise<Blob> {
-    const baseUrl = (this.client as any).config.baseUrl;
-    const token = (this.client as any).config.token;
+    const baseUrl = this.client.config.baseUrl;
+    const token = this.client.config.token;
     const url = `${baseUrl}/api/files/${id}/download`;
 
     const headers: Record<string, string> = {};
@@ -200,8 +200,8 @@ export class FileClient {
   async downloadNode(id: string, outputPath: string, options?: DownloadOptions): Promise<void> {
     const { createWriteStream } = await import('fs');
     
-    const baseUrl = (this.client as any).config.baseUrl;
-    const token = (this.client as any).config.token;
+    const baseUrl = this.client.config.baseUrl;
+    const token = this.client.config.token;
     const url = `${baseUrl}/api/files/${id}/download`;
 
     const response = await fetch(url, {
@@ -249,7 +249,7 @@ export class FileClient {
   }
 
   getUrl(id: string): string {
-    return `${(this.client as any).config.baseUrl}/uploads/${id}`;
+    return `${this.client.config.baseUrl}/uploads/${id}`;
   }
 
   getCategories(): Promise<{ categories: string[]; securityCategories: string[] }> {

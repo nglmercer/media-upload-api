@@ -7,3 +7,6 @@ triggers/*.json
 package-lock.json
 bun.lock
 config.json
+
+#temp
+data/**.json

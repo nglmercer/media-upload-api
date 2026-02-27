@@ -13,6 +13,8 @@ describe('ConfigManager', () => {
     } catch {
       // Ignore if file doesn't exist
     }
+    // Reload config to get clean state
+    config.reload()
   })
 
   afterEach(async () => {
