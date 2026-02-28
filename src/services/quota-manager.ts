@@ -1,11 +1,24 @@
 import fs from 'fs';
 import path from 'path';
 import { config } from '../config';
-import type { FileCategory } from '../types/file';
+import type { FileCategory, SecurityCategory } from '../types/file';
 
 // ============================================================================
 // Types
 // ============================================================================
+
+// Security categories that need to be mapped to valid file categories
+const SECURITY_CATEGORIES: SecurityCategory[] = ['unknown', 'mismatch', 'corrupted', 'disguised'];
+
+// Helper function to ensure category is a valid FileCategory
+function normalizeCategory(category: FileCategory | SecurityCategory): FileCategory {
+  // If it's already a valid FileCategory, return it
+  if (!SECURITY_CATEGORIES.includes(category as SecurityCategory)) {
+    return category as FileCategory;
+  }
+  // Map security categories to 'other'
+  return 'other' as FileCategory;
+}
 
 export interface UsageStats {
   usedFiles: number;
@@ -147,8 +160,10 @@ export class QuotaManager {
   async reserveQuota(
     userId: string | null, 
     fileSize: number, 
-    category: FileCategory
+    category: FileCategory | SecurityCategory
   ): Promise<boolean> {
+    const normalizedCategory = normalizeCategory(category);
+    
     const check = await this.checkQuota(userId, fileSize);
     if (!check.allowed) return false;
     
@@ -157,8 +172,8 @@ export class QuotaManager {
     const userUsage = await this.getUsage(userId);
     userUsage.usedFiles++;
     userUsage.usedStorage += fileSize;
-    userUsage.byCategory[category].count++;
-    userUsage.byCategory[category].storage += fileSize;
+    userUsage.byCategory[normalizedCategory].count++;
+    userUsage.byCategory[normalizedCategory].storage += fileSize;
     
     await this.saveUsage(userKey, userUsage);
     
@@ -166,8 +181,8 @@ export class QuotaManager {
     const globalUsage = await this.getUsage(null);
     globalUsage.usedFiles++;
     globalUsage.usedStorage += fileSize;
-    globalUsage.byCategory[category].count++;
-    globalUsage.byCategory[category].storage += fileSize;
+    globalUsage.byCategory[normalizedCategory].count++;
+    globalUsage.byCategory[normalizedCategory].storage += fileSize;
     
     await this.saveUsage('_global', globalUsage);
     
@@ -177,16 +192,17 @@ export class QuotaManager {
   async releaseQuota(
     userId: string | null, 
     fileSize: number,
-    category: FileCategory
+    category: FileCategory | SecurityCategory
   ): Promise<void> {
+    const normalizedCategory = normalizeCategory(category);
     const userKey = userId || '_anonymous';
     
     // Update user usage
     const userUsage = await this.getUsage(userId);
     userUsage.usedFiles = Math.max(0, userUsage.usedFiles - 1);
     userUsage.usedStorage = Math.max(0, userUsage.usedStorage - fileSize);
-    userUsage.byCategory[category].count = Math.max(0, userUsage.byCategory[category].count - 1);
-    userUsage.byCategory[category].storage = Math.max(0, userUsage.byCategory[category].storage - fileSize);
+    userUsage.byCategory[normalizedCategory].count = Math.max(0, userUsage.byCategory[normalizedCategory].count - 1);
+    userUsage.byCategory[normalizedCategory].storage = Math.max(0, userUsage.byCategory[normalizedCategory].storage - fileSize);
     
     await this.saveUsage(userKey, userUsage);
     
@@ -194,8 +210,8 @@ export class QuotaManager {
     const globalUsage = await this.getUsage(null);
     globalUsage.usedFiles = Math.max(0, globalUsage.usedFiles - 1);
     globalUsage.usedStorage = Math.max(0, globalUsage.usedStorage - fileSize);
-    globalUsage.byCategory[category].count = Math.max(0, globalUsage.byCategory[category].count - 1);
-    globalUsage.byCategory[category].storage = Math.max(0, globalUsage.byCategory[category].storage - fileSize);
+    globalUsage.byCategory[normalizedCategory].count = Math.max(0, globalUsage.byCategory[normalizedCategory].count - 1);
+    globalUsage.byCategory[normalizedCategory].storage = Math.max(0, globalUsage.byCategory[normalizedCategory].storage - fileSize);
     
     await this.saveUsage('_global', globalUsage);
   }
