@@ -15,8 +15,8 @@ import { filesRouter } from './routers/files'
 import { quotaRouter } from './routers/quota'
 
 // Import Discovery (optional, enabled by default via env var)
-import { initDiscovery, createDiscoveryShutdownHandler, type Discovery as DiscoveryType } from './discover';
-
+import { createDiscoveryShutdownHandler, type Discovery as DiscoveryType } from './discover';
+import { initDiscovery } from './discover/init'
 // Initialize file store
 import { initFileStore } from './store/fileStore'
 initFileStore()
