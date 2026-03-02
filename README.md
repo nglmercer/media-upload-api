@@ -25,6 +25,9 @@ The API includes an optional UDP multicast service discovery feature that allows
 | `DISCOVERY_SERVICE_VERSION` | `1.0.0` | Version of your service |
 | `DISCOVERY_MULTICAST_ADDRESS` | `239.255.255.250` | Multicast group address |
 | `DISCOVERY_MULTICAST_PORT` | `54321` | Multicast UDP port |
+| `DISCOVERY_HEARTBEAT_INTERVAL` | `5000` | Heartbeat interval in milliseconds |
+| `DISCOVERY_OFFLINE_TIMEOUT` | `15000` | Timeout before marking service as offline (ms) |
+| `DISCOVERY_SETUP_HOOKS` | `true` | Setup process exit hooks (`true` or `false`)
 
 **Example - Disable Discovery:**
 ```bash

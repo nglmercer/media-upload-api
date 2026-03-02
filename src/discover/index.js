@@ -285,3 +285,11 @@ class Discovery extends EventEmitter3 {
 export {
   Discovery
 };
+
+// Re-export init functions
+export {
+  initDiscovery,
+  getDiscoveryConfig,
+  stopDiscovery,
+  createDiscoveryShutdownHandler,
+} from './init.js';

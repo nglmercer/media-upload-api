@@ -15,7 +15,7 @@ import { filesRouter } from './routers/files'
 import { quotaRouter } from './routers/quota'
 
 // Import Discovery (optional, enabled by default via env var)
-import { Discovery } from './discover';
+import { initDiscovery, createDiscoveryShutdownHandler, type Discovery as DiscoveryType } from './discover';
 
 // Initialize file store
 import { initFileStore } from './store/fileStore'
@@ -88,73 +88,7 @@ const serverConfig = loadConfig()
 // Discovery Service (optional, enabled by default via DISCOVERY_ENABLED env var)
 // ============================================================================
 
-interface DiscoveryConfig {
-  enabled: boolean;
-  serviceName?: string;
-  serviceVersion?: string;
-  multicastAddress?: string;
-  multicastPort?: number;
-}
-
-function getDiscoveryConfig(): DiscoveryConfig {
-  // Check for DISCOVERY_ENABLED env var (default: true)
-  const envEnabled = process.env.DISCOVERY_ENABLED;
-  const enabled = envEnabled === undefined ? true : envEnabled.toLowerCase() === 'true';
-  
-  return {
-    enabled,
-    serviceName: process.env.DISCOVERY_SERVICE_NAME || 'media-upload-api',
-    serviceVersion: process.env.DISCOVERY_SERVICE_VERSION || '1.0.0',
-    multicastAddress: process.env.DISCOVERY_MULTICAST_ADDRESS || '239.255.255.250',
-    multicastPort: parseInt(process.env.DISCOVERY_MULTICAST_PORT || '54321', 10),
-  };
-}
-
-let discoveryInstance: Discovery | null = null;
-
-async function initDiscovery(port: number) {
-  const discoveryConfig = getDiscoveryConfig();
-  
-  if (!discoveryConfig.enabled) {
-    console.log('[Discovery] Service discovery is disabled (DISCOVERY_ENABLED=false)');
-    return;
-  }
-  
-  try {
-    discoveryInstance = new Discovery(
-      {
-        name: discoveryConfig.serviceName,
-        version: discoveryConfig.serviceVersion,
-        schema: 'http',
-      },
-      port,
-      {
-        multicastAddress: discoveryConfig.multicastAddress,
-        multicastPort: discoveryConfig.multicastPort,
-        heartbeatInterval: 5000,
-        offlineTimeout: 15000,
-      }
-    );
-    
-    // Set up event handlers
-    discoveryInstance.on('online', (service) => {
-      console.log(`[Discovery] Service online: ${service.name} (${service.id}) at ${service.ip}:${service.port}`);
-    });
-    
-    discoveryInstance.on('offline', (service) => {
-      console.log(`[Discovery] Service offline: ${service.name} (${service.id})`);
-    });
-    
-    discoveryInstance.on('error', (err) => {
-      console.error('[Discovery] Error:', err.message);
-    });
-    
-    await discoveryInstance.start();
-    console.log(`[Discovery] Service discovery started (service: ${discoveryConfig.serviceName}, port: ${discoveryConfig.multicastPort})`);
-  } catch (error) {
-    console.warn('[Discovery] Failed to start service discovery:', error);
-  }
-}
+let discoveryInstance: DiscoveryType | null = null;
 
 // Start server
 try {
@@ -170,7 +104,9 @@ try {
   
   // Initialize Discovery service after server starts
   const actualPort = server.port || serverConfig.port;
-  initDiscovery(actualPort);
+  initDiscovery(actualPort).then(instance => {
+    discoveryInstance = instance;
+  });
   
   // Handle graceful shutdown
   const shutdown = () => {
@@ -197,7 +133,9 @@ try {
   
   // Initialize Discovery service after server starts
   const actualPort = server.port || serverConfig.port;
-  initDiscovery(actualPort);
+  initDiscovery(actualPort).then(instance => {
+    discoveryInstance = instance;
+  });
   
   // Handle graceful shutdown
   const shutdown = () => {
