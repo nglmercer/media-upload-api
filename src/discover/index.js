@@ -1,6 +1,6 @@
 // src/Discovery.ts
 import { EventEmitter as EventEmitter3 } from "events";
-import os from "os";
+import os2 from "os";
 import crypto from "crypto";
 
 // src/modules/Registry.ts
@@ -66,10 +66,37 @@ class Registry extends EventEmitter {
 
 // src/modules/Network.ts
 import dgram from "dgram";
+import os from "os";
 import { EventEmitter as EventEmitter2 } from "events";
 
+// src/modules/debug.ts
+class Logger {
+  enabled = false;
+  enable() {
+    this.enabled = true;
+  }
+  disable() {
+    this.enabled = false;
+  }
+  log(...args) {
+    if (this.enabled)
+      console.log(...args);
+  }
+  warn(...args) {
+    if (this.enabled)
+      console.warn(...args);
+  }
+  error(...args) {
+    if (this.enabled)
+      console.error(...args);
+  }
+}
+var logger = new Logger;
+
+// src/modules/Network.ts
 class Network extends EventEmitter2 {
   socket = null;
+  senderSocket = null;
   options;
   serviceInfo;
   port;
@@ -79,9 +106,62 @@ class Network extends EventEmitter2 {
     this.port = port;
     this.options = options;
   }
+  getLocalInterfaces() {
+    const interfaces = os.networkInterfaces();
+    const internalAddresses = [];
+    const externalAddresses = [];
+    for (const name of Object.keys(interfaces)) {
+      const iface = interfaces[name];
+      if (!iface)
+        continue;
+      for (const config of iface) {
+        if (config.family === "IPv4") {
+          if (config.internal) {
+            internalAddresses.push(config.address);
+          } else {
+            externalAddresses.push(config.address);
+          }
+        }
+      }
+    }
+    const allAddresses = [...externalAddresses, ...internalAddresses];
+    return allAddresses.length > 0 ? allAddresses : ["127.0.0.1"];
+  }
   async start() {
+    if (this.options.multicastInterface) {
+      return this.startWithInterface(this.options.multicastInterface);
+    }
+    return this.startWithInterface("0.0.0.0");
+  }
+  startWithInterface(iface) {
     return new Promise((resolve, reject) => {
+      if (this.socket) {
+        try {
+          this.socket.close();
+        } catch (e) {}
+      }
+      if (this.senderSocket) {
+        try {
+          this.senderSocket.close();
+        } catch (e) {}
+      }
       this.socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
+      this.senderSocket = dgram.createSocket({ type: "udp4" });
+      let pendingBinds = 2;
+      const checkDone = () => {
+        pendingBinds--;
+        if (pendingBinds === 0) {
+          logger.log(`[Discovery] Multicast bound to ${iface}:${this.options.multicastPort}`);
+          resolve();
+        }
+      };
+      this.senderSocket.bind(0, () => {
+        try {
+          this.senderSocket.setMulticastTTL(64);
+          this.senderSocket.setMulticastLoopback(true);
+        } catch (e) {}
+        checkDone();
+      });
       this.socket.on("error", (err) => {
         this.emit("error", err);
         reject(err);
@@ -92,24 +172,34 @@ class Network extends EventEmitter2 {
           this.emit("message", data, rinfo.address);
         } catch (e) {}
       });
-      this.socket.bind(this.options.multicastPort, () => {
+      this.socket.bind(this.options.multicastPort, undefined, () => {
         if (!this.socket)
           return;
-        this.socket.setBroadcast(true);
-        this.socket.setMulticastTTL(128);
-        this.socket.setMulticastLoopback(true);
-        if (this.options.multicastInterface) {
-          this.socket.addMembership(this.options.multicastAddress, this.options.multicastInterface);
-          this.socket.setMulticastInterface(this.options.multicastInterface);
-        } else {
-          this.socket.addMembership(this.options.multicastAddress);
+        try {
+          this.socket.setBroadcast(true);
+          this.socket.setMulticastTTL(64);
+          this.socket.setMulticastLoopback(true);
+          if (iface === "0.0.0.0") {
+            const addresses = this.getLocalInterfaces();
+            for (const addr of addresses) {
+              try {
+                this.socket.addMembership(this.options.multicastAddress, addr);
+              } catch (e) {}
+            }
+          } else {
+            try {
+              this.socket.addMembership(this.options.multicastAddress, iface);
+            } catch (e) {}
+          }
+          checkDone();
+        } catch (e) {
+          reject(e);
         }
-        resolve();
       });
     });
   }
   broadcastPresence(type) {
-    if (!this.socket)
+    if (!this.senderSocket)
       return;
     const message = {
       type,
@@ -120,7 +210,33 @@ class Network extends EventEmitter2 {
       }
     };
     const buffer = Buffer.from(JSON.stringify(message));
-    this.socket.send(buffer, 0, buffer.length, this.options.multicastPort, this.options.multicastAddress);
+    if (this.options.multicastInterface) {
+      try {
+        this.senderSocket.setMulticastInterface(this.options.multicastInterface);
+        this.senderSocket.send(buffer, 0, buffer.length, this.options.multicastPort, this.options.multicastAddress);
+      } catch (e) {
+        logger.log(`[Discovery] Failed to broadcast on specific interface ${this.options.multicastInterface}:`, e);
+      }
+      return;
+    }
+    const addresses = this.getLocalInterfaces();
+    const sendSequentially = (index) => {
+      if (index >= addresses.length)
+        return;
+      const addr = addresses[index];
+      try {
+        this.senderSocket.setMulticastInterface(addr);
+        this.senderSocket.send(buffer, 0, buffer.length, this.options.multicastPort, this.options.multicastAddress, (err) => {
+          if (err)
+            logger.log(`[Discovery] Broadcast error on ${addr}:`, err);
+          sendSequentially(index + 1);
+        });
+      } catch (e) {
+        logger.log(`[Discovery] Failed to broadcast on ${addr}:`, e);
+        sendSequentially(index + 1);
+      }
+    };
+    sendSequentially(0);
   }
   stop() {
     if (this.socket) {
@@ -128,6 +244,12 @@ class Network extends EventEmitter2 {
         this.socket.close();
       } catch (e) {}
       this.socket = null;
+    }
+    if (this.senderSocket) {
+      try {
+        this.senderSocket.close();
+      } catch (e) {}
+      this.senderSocket = null;
     }
   }
 }
@@ -166,7 +288,7 @@ class ClientFactory {
 // src/Discovery.ts
 function generateServiceId(name) {
   const random = crypto.randomBytes(4).toString("hex");
-  const hostname = os.hostname().replace(/[^a-zA-Z0-9]/g, "-").substring(0, 8);
+  const hostname = os2.hostname().replace(/[^a-zA-Z0-9]/g, "-").substring(0, 8);
   const prefix = name ? `${name}-` : "service";
   return `${prefix}-${hostname}-${random}`;
 }
@@ -224,9 +346,10 @@ class Discovery extends EventEmitter3 {
     }
   }
   handleMessage(msg, senderIp) {
+    if (!msg || !msg.service)
+      return;
     if (msg.service.id === this.serviceInfo.id)
       return;
-    console.log(`[${this.serviceInfo.id}] Received ${msg.type} from ${msg.service.id}`);
     if (msg.type === "goodbye") {
       this.registry.remove(msg.service.id);
       return;
@@ -237,6 +360,9 @@ class Discovery extends EventEmitter3 {
       lastSeen: Date.now()
     };
     this.registry.update(msg.service.id, discoveredService);
+    if (msg.type === "hello") {
+      this.network.broadcastPresence("heartbeat");
+    }
   }
   startTimers() {
     this.heartbeatTimer = setInterval(() => {
@@ -285,11 +411,3 @@ class Discovery extends EventEmitter3 {
 export {
   Discovery
 };
-
-// Re-export init functions
-export {
-  initDiscovery,
-  getDiscoveryConfig,
-  stopDiscovery,
-  createDiscoveryShutdownHandler,
-} from './init.js';
