@@ -1,151 +1,18 @@
-import { Hono } from 'hono'
-import { serveStatic } from 'hono/bun'
-import { upgradeWebSocket, websocket } from 'hono/bun'
-import { cors } from 'hono/cors'
-import { logger } from 'hono/logger'
-import { ServerWebSocket } from 'bun';
-import { io, type WebSocketData } from './websocket-adapter';
-import { config, loadConfig, createConfigFile, saveConfig } from './config'
-import { authMiddleware } from './middleware/auth'
+/**
+ * Media Upload API - Entry Point
+ * 
+ * This file serves as the main entry point for the application.
+ * It re-exports the app and server for flexibility.
+ * 
+ * Usage:
+ * - bun run src/index.ts    - Start the server
+ * - bun run src/server.ts   - Alternative entry point
+ * - Import app from './app' - Get the Hono app without starting server
+ */
 
-// Import routers
-import { configRouter } from './routers/config'
-import { authRouter } from './routers/auth'
-import { filesRouter } from './routers/files'
-import { quotaRouter } from './routers/quota'
+export { createApp, io, config, loadConfig } from './app'
+export { startServer } from './server'
 
-// Import Discovery (optional, enabled by default via env var)
-import { createDiscoveryShutdownHandler, type Discovery as DiscoveryType } from './discover';
-import { initDiscovery } from './discover/init'
-// Initialize file store
-import { initFileStore } from './store/fileStore'
-initFileStore()
-
-// Create default config file if it doesn't exist
-createConfigFile()
-
-const app = new Hono()
-
-app.use(logger())
-app.use(cors({
-  origin: '*',
-}))
-
-app.get('/', (c) => {
-  return c.text('Media Upload API')
-})
-
-// Serve uploaded files
-app.use('/uploads/*', serveStatic({ root: './' }))
-
-// Apply auth middleware globally
-app.use('/*', authMiddleware)
-
-// Mount config routes (public + admin)
-app.route('/api/config', configRouter)
-
-// Mount auth routes
-app.route('/api/auth', authRouter)
-
-// Mount file routes
-app.route('/api/files', filesRouter)
-
-// Mount quota routes
-app.route('/api/quota', quotaRouter)
-
-// WebSocket handling
-io.on('connection', (socket) => {
-  console.log(`Client connected: ${socket.id}`)
-  socket.on('disconnect', () => {
-    console.log(`Client disconnected: ${socket.id}`)
-  })
-})
-
-app.get(
-  '/ws',
-  upgradeWebSocket((c) => {
-    return {
-      onOpen: (event, ws) => {
-        io.handleOpen(ws.raw as ServerWebSocket<WebSocketData>);
-      },
-      onMessage: (event, ws) => {
-        io.handleMessage(ws.raw as ServerWebSocket<WebSocketData>, event.data.toString());
-      },
-      onClose: (event, ws) => {
-        io.handleClose(ws.raw as ServerWebSocket<WebSocketData>, event.code, event.reason);
-      },
-      onError: (event, ws) => {
-        console.error('WebSocket error:', event)
-      }
-    }
-  })
-)
-
-// Get server config
-const serverConfig = loadConfig()
-
-// ============================================================================
-// Discovery Service (optional, enabled by default via DISCOVERY_ENABLED env var)
-// ============================================================================
-
-let discoveryInstance: DiscoveryType | null = null;
-
-// Start server
-try {
-  const server = Bun.serve({
-    fetch: app.fetch,
-    port: serverConfig.port,
-    websocket,
-  });
-  console.log(`Server running on port ${server.port}`);
-  saveConfig({
-    port: server.port,
-  })
-  
-  // Initialize Discovery service after server starts
-  const actualPort = server.port || serverConfig.port;
-  initDiscovery(actualPort).then(instance => {
-    discoveryInstance = instance;
-  });
-  
-  // Handle graceful shutdown
-  const shutdown = () => {
-    console.log('Shutting down server...');
-    if (discoveryInstance) {
-      discoveryInstance.stop();
-    }
-    process.exit(0);
-  };
-  
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-  
-} catch (error) {
-  const server = Bun.serve({
-    fetch: app.fetch,
-    port: 0,
-    websocket,
-  });
-  saveConfig({
-    port: server.port,
-  })
-  console.log(`Server running on random port ${server.port}`);
-  
-  // Initialize Discovery service after server starts
-  const actualPort = server.port || serverConfig.port;
-  initDiscovery(actualPort).then(instance => {
-    discoveryInstance = instance;
-  });
-  
-  // Handle graceful shutdown
-  const shutdown = () => {
-    console.log('Shutting down server...');
-    if (discoveryInstance) {
-      discoveryInstance.stop();
-    }
-    process.exit(0);
-  };
-  
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-}
+// Start server when run directly
+import { startServer } from './server'
+startServer()
