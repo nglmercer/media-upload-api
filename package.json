@@ -2,6 +2,13 @@
   "name": "widget-overlay-api",
   "scripts": {
     "build": "bun build src/index.ts --target=bun --outfile=dist/index",
+    "build:app": "bun build --compile src/index.ts --outfile=dist/media-upload-api",
+    "build:linux": "bun build --compile --target=bun-linux-x64 src/index.ts --outfile=dist/media-upload-api-linux-x64",
+    "build:linux-arm64": "bun build --compile --target=bun-linux-arm64 src/index.ts --outfile=dist/media-upload-api-linux-arm64",
+    "build:windows": "bun build --compile --target=bun-windows-x64 src/index.ts --outfile=dist/media-upload-api-windows-x64",
+    "build:macos": "bun build --compile --target=bun-darwin-x64 src/index.ts --outfile=dist/media-upload-api-darwin-x64",
+    "build:macos-arm64": "bun build --compile --target=bun-darwin-arm64 src/index.ts --outfile=dist/media-upload-api-darwin-arm64",
+    "build:prod": "bun build --compile --minify --sourcemap --bytecode src/index.ts --outfile=dist/media-upload-api",
     "dev": "bun run --hot src/index.ts",
     "start": "bun src/index.ts",
     "typecheck": "bunx tsc --noEmit",
