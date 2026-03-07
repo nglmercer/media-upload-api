@@ -2,6 +2,7 @@
   "name": "widget-overlay-api",
   "scripts": {
     "build": "bun build src/index.ts --target=bun --outfile=dist/index",
+    "build:server": "bun build src/index.ts --target=bun --outfile=dist/server",
     "build:app": "bun build --compile src/index.ts --outfile=dist/media-upload-api",
     "build:linux": "bun build --compile --target=bun-linux-x64 src/index.ts --outfile=dist/media-upload-api-linux-x64",
     "build:linux-arm64": "bun build --compile --target=bun-linux-arm64 src/index.ts --outfile=dist/media-upload-api-linux-arm64",
