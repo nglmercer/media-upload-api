@@ -1,40 +1,61 @@
 # API Reference
 
-## Media API
-Base URL: `/api/media`
+## Files API
+Base URL: `/api/files`
 
-### Upload media
-`POST /upload/:type`
-- **Params**: `:type` = `image` | `audio` | `video` | `subtitle`
+### Upload file
+`POST /`
 - **Headers**: `Content-Type: multipart/form-data`
 - **Body**:
   - `file` (required) — the binary file
-  - `name` (optional) — display name
-  - `metadata` (optional) — JSON string (e.g. `{"duration": 120}`)
-- **Response**: `201 Created` with Media object.
+  - `metadata` (optional) — JSON string
+- **Response**: `201 Created` with File object.
 
-### List media
-`GET /data`
-- **Response**: Array of all media records.
+### List files
+`GET /`
+- **Query Params**:
+  - `category` (optional) — filter by category
+  - `status` (optional) — filter by status
+  - `page` (optional) — page number (default: 1)
+  - `pageSize` (optional) — items per page (default: 50)
+- **Response**: Object with `files` array and `pagination` info.
 
-`GET /data/:type`
-- **Params**: `:type` = `image` | `audio` | `video` | `subtitle`
-- **Response**: Array of media records of the specified type.
+### List categories
+`GET /categories`
+- **Response**: Available file categories.
 
-### Get Media Stats
-`GET /stats`
-- **Response**: Statistics about stored media (count, size).
+### List suspicious files
+`GET /suspicious`
+- **Response**: Suspicious and quarantine files.
 
-### Get Media Size
-`GET /:id/size`
+### Get file metadata
+`GET /:id`
 - **Params**: `:id` = UUID
-- **Response**: Size information for the media file.
+- **Response**: File metadata object.
 
-### Delete media
+### Download file
+`GET /:id/download`
+- **Params**: `:id` = UUID
+- **Response**: Binary file download.
+
+### Delete file
 `DELETE /:id`
 - **Params**: `:id` = UUID
-- **Response**: `200 OK`
+- **Response**: Success message.
 
-### Sync Media
-`POST /sync`
-- Scans the uploads directory and adds missing files to the database.
+### Update file status
+`PUT /:id/status`
+- **Params**: `:id` = UUID
+- **Body**: `{ "status": "valid" | "suspicious" | "quarantine" | "deleted" }`
+- **Response**: Updated file object.
+
+## Quota API
+Base URL: `/api/quota`
+
+### Get user quota
+`GET /`
+- **Response**: User quota information (used, limit, etc.).
+
+### Get global quota
+`GET /global`
+- **Response**: Global quota statistics.

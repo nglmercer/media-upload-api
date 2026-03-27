@@ -16,11 +16,40 @@ import {
   ValidationError 
 } from './errors';
 
-// Environment detection
+// Environment detection - always defaults to 'browser' for safety
 function detectEnvironment(): Environment {
-  if (typeof window !== 'undefined') return 'browser';
-  if (typeof Bun !== 'undefined') return 'bun';
-  if (typeof process !== 'undefined' && process.versions?.node) return 'node';
+  // Default to browser for safety
+  let detectedEnv: Environment = 'browser';
+  
+  try {
+    // Check for browser first (most common case)
+    if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
+      return 'browser';
+    }
+    
+    // Check for Bun
+    //@ts-ignore - Bun global may not be recognized
+    if (typeof Bun !== 'undefined') {
+      return 'bun';
+    }
+    
+    // Check for Node.js - be very explicit about the check
+    if (
+      typeof process !== 'undefined' &&
+      process !== null &&
+      typeof process.versions === 'object' &&
+      process.versions !== null &&
+      typeof process.versions.node === 'string' &&
+      process.versions.node.length > 0
+    ) {
+      return 'node';
+    }
+  } catch {
+    // Any error during detection, default to browser
+    return 'browser';
+  }
+  
+  // Default to browser for any unexpected case
   return 'browser';
 }
 
@@ -84,11 +113,22 @@ async function executeRequest<T>(
 }
 
 // Core client class
+import { resolveBackendUrl } from './utils';
+
 export class CoreClient {
   public config: Required<ClientConfig>;
 
   constructor(config: ClientConfig) {
-    if (!config.baseUrl) {
+    // Provide a dynamic fallback for browser environments
+    const defaultBaseUrl = resolveBackendUrl();
+
+    const configWithDefaults = {
+      // Override the baseUrl if it's provided in config, otherwise use the default
+      ...(config.baseUrl ? {} : { baseUrl: defaultBaseUrl }),
+      ...config,
+    };
+    
+    if (!configWithDefaults.baseUrl) {
       throw new ValidationError('baseUrl is required');
     }
 
@@ -98,7 +138,7 @@ export class CoreClient {
       retryDelay: 1000,
       onRequest: undefined,
       onResponse: undefined,
-      ...config,
+      ...configWithDefaults,
     } as Required<ClientConfig>;
   }
 

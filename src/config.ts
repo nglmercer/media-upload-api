@@ -100,7 +100,7 @@ export type Config = z.infer<typeof FullConfigSchema>;
 // ============================================================================
 
 const DEFAULT_SERVER_CONFIG: ServerConfig = {
-  port: 3000,
+  port: 3001,
   host: "0.0.0.0",
   uploadsDir: "uploads",
   dataDir: "data",

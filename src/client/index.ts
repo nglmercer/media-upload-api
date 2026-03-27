@@ -21,6 +21,7 @@ export type {
   UploadOptions,
   DownloadOptions,
   Environment,
+  FileTypes
 } from './types';
 
 // Re-export errors
@@ -40,7 +41,7 @@ export { FileClient } from './files';
 export { QuotaClient } from './quota';
 export { ConfigClient } from './config';
 export { AuthClient } from './auth';
-
+export { FileCategory } from './types';
 // ============================================================================
 // Main MediaUploadClient Class
 // ============================================================================

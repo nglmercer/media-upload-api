@@ -1,21 +1,21 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "strict": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "bundler",
     "isolatedModules": true,
-    "resolveJsonModule": true,
-    "outDir": "dist",
-    "declaration": true,
-    "sourceMap": true
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "outDir": "./dist",
+    "paths": {
+      "@/*": ["./*"]
+    }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "client/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -113,10 +113,22 @@ export interface FileItem {
   updatedAt: number;
   deletedAt: number | null;
 }
-
+export const FileCategory = {
+  IMAGE: 'image',
+  AUDIO: 'audio',
+  VIDEO: 'video',
+  DOCUMENT: 'document',
+  ARCHIVE: 'archive',
+  APPLICATION: 'application',
+  FONT: 'font',
+  MODEL: 'model',
+  DATA: 'data',
+  OTHER: 'other',
+} as const;
+export type FileTypes = typeof FileCategory[keyof typeof FileCategory];
 export interface UploadOptions {
   metadata?: Record<string, unknown>;
-  category?: string;
+  category?: FileTypes;
   onProgress?: ProgressCallback;
 }
 

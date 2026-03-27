@@ -20,9 +20,11 @@
     "test:integration": "bun test tests/media.test.ts tests/integration.test.ts"
   },
   "dependencies": {
+    "@lit/localize": "^0.12.2",
     "file-type": "^21.1.1",
     "hono": "^4.9.5",
     "json-obj-manager": "^3.6.0",
+    "lit": "^3.3.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -18,6 +18,7 @@ initFileStore()
 
 // Create default config file if it doesn't exist
 import { createConfigFile } from './config'
+import { serve } from 'bun'
 createConfigFile()
 
 /**
@@ -65,4 +66,8 @@ export { config, loadConfig }
 
 // Default export for convenience (e.g., bun run, testing)
 const app = createApp()
-export default app
+serve({
+  fetch: app.fetch,
+  port: '3001',
+})
+//export default app
