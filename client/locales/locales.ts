@@ -2,6 +2,7 @@ import { LitElement } from 'lit';
 import { configureLocalization } from '@lit/localize';
 import esTranslations from './es.json';
 import enTranslations from './en.json';
+import { WidgetEvents, WidgetEventTypes } from '../events';
 // Do not modify this file by hand!
 // Re-generate this file by running lit-localize.
 
@@ -64,6 +65,9 @@ export const setLocale = async (locale: any): Promise<void> => {
   
   // 2) Trigger legacy components that rely on the custom event
   window.dispatchEvent(new CustomEvent('locale-changed', { detail: { locale } }));
+  
+  // 3) Emit global widget event for cross-component communication
+  WidgetEvents.emit(WidgetEventTypes.LOCALE_CHANGE, { locale });
 };
 
 export const getLocaleTranslations = (): Record<string, string> => {

@@ -4,6 +4,7 @@ import type { FileItem } from '../../src/client';
 import { createBrowserClient } from '../../src/client';
 import { style } from './stylesitem';
 import { getBackendUrl } from '../config';
+import { WidgetEvents, WidgetEventTypes } from '../events';
 const apiClient = createBrowserClient({ baseUrl: getBackendUrl() });
 
 /**
@@ -84,11 +85,13 @@ export class MediaLibraryItem extends LitElement {
   }
 
   private _emitPlayStop() {
+    const detail = { id: this.item.id };
     this.dispatchEvent(new CustomEvent('ml-play-stop', {
-      detail: { id: this.item.id },
+      detail,
       bubbles: true,
       composed: true,
     }));
+    WidgetEvents.emit(WidgetEventTypes.ML_PLAY_STOP, detail);
   }
 
   private togglePlay(e: Event) {
@@ -114,12 +117,13 @@ export class MediaLibraryItem extends LitElement {
     this.audio = audio;
     this.isPlaying = true;
 
-    // Tell the parent this card is the new "playing" card
+    const detail = { id: this.item.id };
     this.dispatchEvent(new CustomEvent('ml-play-start', {
-      detail: { id: this.item.id },
+      detail,
       bubbles: true,
       composed: true,
     }));
+    WidgetEvents.emit(WidgetEventTypes.ML_PLAY_START, detail);
   }
 
   private toggleVideoPlay(e: Event, url: string) {
@@ -147,31 +151,40 @@ export class MediaLibraryItem extends LitElement {
     this.video = videoEl;
     this.isPlaying = true;
 
-    // Tell the parent this card is the new "playing" card
+    const detail = { id: this.item.id };
     this.dispatchEvent(new CustomEvent('ml-play-start', {
-      detail: { id: this.item.id },
+      detail,
       bubbles: true,
       composed: true,
     }));
+    WidgetEvents.emit(WidgetEventTypes.ML_PLAY_START, detail);
   }
 
   // ── Selection / delete ───────────────────────────────────────────────────
 
   private handleSelect() {
+    const detail = { item: this.item };
     this.dispatchEvent(new CustomEvent('ml-select', {
-      detail: { item: this.item },
+      detail,
       bubbles: true,
       composed: true,
     }));
+    WidgetEvents.emit(WidgetEventTypes.ML_SELECT, {
+      id: this.item.id,
+      name: this.item.originalName,
+      url: apiClient.files.getUrl(this.item),
+    });
   }
 
   private handleDelete(e: Event) {
     e.stopPropagation();
+    const detail = { id: this.item.id };
     this.dispatchEvent(new CustomEvent('ml-delete', {
-      detail: { id: this.item.id },
+      detail,
       bubbles: true,
       composed: true,
     }));
+    WidgetEvents.emit(WidgetEventTypes.ML_DELETE, detail);
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────

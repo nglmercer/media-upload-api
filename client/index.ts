@@ -11,6 +11,7 @@ import './components/itemlibrary';
 import type { MediaLibraryItem } from './components/itemlibrary';
 import { resolveServiceUrl, normalizeMediaUrl } from './config';
 import type { MediaUploadClient } from '../src/client/index';
+import { WidgetEvents, WidgetEventTypes } from './events';
 
 @Component('media-library')
 export class MediaLibrary extends LitElement {
@@ -66,6 +67,15 @@ export class MediaLibrary extends LitElement {
     this.apiClient = createBrowserClient({ baseUrl });
     this.fetchFiles();
     this.fetchQuota();
+
+    // Emit global open event
+    WidgetEvents.emit(WidgetEventTypes.ML_OPEN, { type: this.type });
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    // Emit global close event
+    WidgetEvents.emit(WidgetEventTypes.ML_CLOSE, {});
   }
 
   /**
@@ -182,6 +192,8 @@ export class MediaLibrary extends LitElement {
     this.uploading = true;
     this.error = null;
 
+    WidgetEvents.emit(WidgetEventTypes.ML_UPLOAD_START, { count: files.length });
+
     // Upload files in parallel with progress tracking
     const uploadPromises = files.map(async (file, index) => {
       try {
@@ -194,24 +206,29 @@ export class MediaLibrary extends LitElement {
         this.uploadQueue = this.uploadQueue.map((item, i) =>
           i === index ? { ...item, progress: 50 } : item
         );
+        WidgetEvents.emit(WidgetEventTypes.ML_UPLOAD_PROGRESS, { fileName: file.name, progress: 50, completed: false });
 
         await this.apiClient.files.upload(file, { category });
 
         this.uploadQueue = this.uploadQueue.map((item, i) =>
           i === index ? { ...item, progress: 100, completed: true } : item
         );
+        WidgetEvents.emit(WidgetEventTypes.ML_UPLOAD_PROGRESS, { fileName: file.name, progress: 100, completed: true });
       } catch (err: any) {
         this.uploadQueue = this.uploadQueue.map((item, i) =>
           i === index ? { ...item, error: err.message || 'Upload failed', progress: 0 } : item
         );
+        WidgetEvents.emit(WidgetEventTypes.ML_UPLOAD_ERROR, { fileName: file.name, error: err.message });
       }
     });
 
     try {
       await Promise.all(uploadPromises);
       await Promise.all([this.fetchFiles(), this.fetchQuota()]);
+      WidgetEvents.emit(WidgetEventTypes.ML_UPLOAD_COMPLETE, { count: files.length });
     } catch (err: any) {
       this.error = err.message ?? 'Error uploading files';
+      WidgetEvents.emit(WidgetEventTypes.ML_UPLOAD_ERROR, { fileName: '', error: err.message });
     } finally {
       // Clear queue after a short delay to show completion
       setTimeout(() => {
@@ -240,6 +257,7 @@ export class MediaLibrary extends LitElement {
       await Promise.all([this.fetchFiles(), this.fetchQuota()]);
     } catch (err: any) {
       alert('Error deleting file: ' + err.message);
+      WidgetEvents.emit(WidgetEventTypes.ML_UPLOAD_ERROR, { fileName: '', error: err.message });
     }
   }
 
@@ -283,13 +301,13 @@ export class MediaLibrary extends LitElement {
     const url  = normalizeMediaUrl(this.apiClient.files.getUrl(selected)) || '';
     const name = selected.originalName;
 
-    // Support both callback prop and event-based integration
     this.onSelect(url, name);
     this.dispatchEvent(new CustomEvent('media-select', {
       detail: { url, name },
       bubbles: true,
       composed: true,
     }));
+    WidgetEvents.emit(WidgetEventTypes.ML_SELECT_FINAL, { url, name, selected });
   }
 
   private handleClose() {
@@ -298,6 +316,7 @@ export class MediaLibrary extends LitElement {
       bubbles: true,
       composed: true,
     }));
+    WidgetEvents.emit(WidgetEventTypes.ML_CLOSE, {});
   }
 
   // ── Computed (pure, no side-effects) ────────────────────────────────────

@@ -2,6 +2,7 @@ import { html, css, LitElement,unsafeCSS } from 'lit';
 import { Component, property, state, query } from './litcomponents';
 import { LocalizeController } from '../locales/locales';
 import styles from './Dialog.css?inline';
+import { WidgetEvents, WidgetEventTypes } from '../events';
 export type DialogTheme = 'light' | 'dark' | 'system';
 export type DialogType = 'alert' | 'confirm' | 'prompt' | 'modal';
 export type DialogResult = boolean | string | null;
@@ -146,6 +147,8 @@ export class AppDialog extends LitElement {
     this._isOpen = true;
     this.requestUpdate();
     
+    WidgetEvents.emit(WidgetEventTypes.DIALOG_OPEN, { type: this.type, title: this.title });
+    
     // Focus input for prompt
     setTimeout(() => {
       if (this.type === 'prompt' && this._inputElement) {
@@ -165,11 +168,13 @@ export class AppDialog extends LitElement {
     this._resolvePromise = null;
     this.requestUpdate();
     
+    const detail = { result, action };
     this.dispatchEvent(new CustomEvent('dialog-close', {
-      detail: { result, action },
+      detail,
       bubbles: true,
       composed: true
     }));
+    WidgetEvents.emit(WidgetEventTypes.DIALOG_CLOSE, detail);
   }
 
   private _handleOverlayClick(e: MouseEvent) {
