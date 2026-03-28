@@ -110,11 +110,11 @@ export const mediaLibraryStyles = css`
   }
   .sort-container label { font-size: 0.8rem; font-weight: 600; color: #9ca3af; white-space: nowrap; }
   .sort-select {
-    background: rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.9);
+    color: black;
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 0.5rem;
     padding: 0.5rem 0.625rem;
-    color: white;
     font-size: 0.8rem;
     outline: none;
     cursor: pointer;

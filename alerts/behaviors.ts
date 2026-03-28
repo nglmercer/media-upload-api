@@ -97,4 +97,21 @@ export function registerBehaviors() {
       }, waitTime);
     });
   });
+
+  // 7. Progress Bar Fill Behavior
+  AlertBehaviorRegistry.register('progress-fill', (el, data) => {
+    const target = data?.target || '100%';
+    const delay = data?.delay || 500;
+    const duration = data?.duration || 1500;
+    
+    // Reset width to 0 first
+    el.style.width = '0%';
+    
+    AlertBuilder.animate(el, {
+      width: target,
+      duration: duration,
+      delay: delay,
+      ease: 'outQuart'
+    });
+  });
 }

@@ -288,6 +288,7 @@ export interface AlertStyle {
   padding?: number | string;
   margin?: number | string;
   width?: number | string;
+  height?: number | string;
   maxWidth?: number | string;
   fontSize?: number | string;
   fontFamily?: string;
@@ -299,6 +300,7 @@ export interface AlertStyle {
   animation?: AlertStyleAnimation;
   overlay?: boolean;
   backdropFilter?: string;
+  overflow?: 'visible' | 'hidden' | 'scroll' | 'auto';
 }
 
 export interface AlertConfig {
@@ -319,6 +321,7 @@ export interface AlertStyleVariables {
   '--alert-padding'?: string;
   '--alert-margin'?: string;
   '--alert-width'?: string;
+  '--alert-height'?: string;
   '--alert-max-width'?: string;
   '--alert-font-size'?: string;
   '--alert-font-family'?: string;
@@ -328,6 +331,7 @@ export interface AlertStyleVariables {
   '--alert-border'?: string;
   '--alert-z-index'?: string;
   '--alert-backdrop-filter'?: string;
+  '--alert-overflow'?: string;
 }
 
 export function styleToVariables(style: AlertStyle): AlertStyleVariables {
@@ -339,6 +343,7 @@ export function styleToVariables(style: AlertStyle): AlertStyleVariables {
   if (style.padding !== undefined) vars['--alert-padding'] = String(style.padding);
   if (style.margin !== undefined) vars['--alert-margin'] = String(style.margin);
   if (style.width !== undefined) vars['--alert-width'] = String(style.width);
+  if (style.height !== undefined) vars['--alert-height'] = String(style.height);
   if (style.maxWidth !== undefined) vars['--alert-max-width'] = String(style.maxWidth);
   if (style.fontSize !== undefined) vars['--alert-font-size'] = String(style.fontSize);
   if (style.fontFamily) vars['--alert-font-family'] = style.fontFamily;
@@ -348,6 +353,7 @@ export function styleToVariables(style: AlertStyle): AlertStyleVariables {
   if (style.border) vars['--alert-border'] = style.border;
   if (style.zIndex !== undefined) vars['--alert-z-index'] = String(style.zIndex);
   if (style.backdropFilter) vars['--alert-backdrop-filter'] = style.backdropFilter;
+  if (style.overflow) vars['--alert-overflow'] = style.overflow;
   
   return vars;
 }

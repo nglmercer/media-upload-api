@@ -174,10 +174,12 @@ export class TriggerAlert extends LitElement {
           padding: var(--alert-padding, 16px);
           margin: var(--alert-margin, 8px);
           width: var(--alert-width, auto);
+          height: var(--alert-height, auto);
           max-width: var(--alert-max-width, 400px);
           box-shadow: var(--alert-box-shadow, 0 4px 12px rgba(0,0,0,0.15));
           border: var(--alert-border, none);
           backdrop-filter: var(--alert-backdrop-filter, none);
+          overflow: var(--alert-overflow, hidden);
           pointer-events: auto;
         }
       </style>
