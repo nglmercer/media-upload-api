@@ -12,6 +12,8 @@
     "build:prod": "bun build --compile --minify --sourcemap --bytecode src/index.ts --outfile=dist/media-upload-api",
     "dev": "bun run --hot src/index.ts",
     "start": "bun src/index.ts",
+    "alerts:demo": "bun --watch ./alerts/demo.html",
+    "alerts:preview": "bun --watch ./alerts/preview.html",
     "typecheck": "bunx tsc --noEmit",
     "test": "bun test",
     "test:watch": "bun test --watch",
@@ -21,9 +23,11 @@
   },
   "dependencies": {
     "@lit/localize": "^0.12.2",
+    "animejs": "^4.3.6",
     "file-type": "^21.1.1",
     "json-obj-manager": "^3.6.0",
     "lit": "^3.3.2",
+    "yaml": "^2.8.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
