@@ -1,54 +1,74 @@
-import { Hono } from "hono";
-import { authMiddleware, getAuth } from "../middleware/auth";
+import { getAuth } from "../middleware/auth";
+import { json, type ServerContext } from "../utils/vanilla-http";
 
-const authRouter = new Hono();
-
-// Apply auth middleware to all routes
-authRouter.use('/*', authMiddleware);
-
-// GET /api/auth/validate - Validate current token
-authRouter.get('/validate', async (c) => {
-  const auth = getAuth(c);
+/**
+ * GET /api/auth/validate - Validate current token
+ */
+async function validateHandler(req: Request, ctx: ServerContext) {
+  const auth = getAuth(ctx);
   
   if (!auth.authenticated) {
-    return c.json({ 
+    return json({ 
       valid: false, 
       message: 'No authentication' 
     });
   }
   
-  return c.json({ 
+  return json({ 
     valid: true, 
     userId: auth.userId 
   });
-});
+}
 
-// GET /api/auth/info - Get authenticated user info
-authRouter.get('/info', async (c) => {
-  const auth = getAuth(c);
+/**
+ * GET /api/auth/info - Get authenticated user info
+ */
+async function infoHandler(req: Request, ctx: ServerContext) {
+  const auth = getAuth(ctx);
   
   if (!auth.authenticated) {
-    return c.json({ 
+    return json({ 
       authenticated: false,
       message: 'Not authenticated' 
     });
   }
   
-  return c.json({
+  return json({
     authenticated: true,
     userId: auth.userId,
     label: auth.tokenLabel,
     permissions: auth.permissions,
   });
-});
+}
 
-// GET /api/auth/permissions - Get current permissions
-authRouter.get('/permissions', async (c) => {
-  const auth = getAuth(c);
+/**
+ * GET /api/auth/permissions - Get current permissions
+ */
+async function permissionsHandler(req: Request, ctx: ServerContext) {
+  const auth = getAuth(ctx);
   
-  return c.json({
+  return json({
     permissions: auth.permissions,
   });
-});
+}
 
-export { authRouter };
+/**
+ * Main Auth Router (Vanilla Switch-case)
+ */
+export async function authRouter(req: Request, ctx: ServerContext): Promise<Response | null> {
+  const { pathname } = ctx.url;
+  const { method } = req;
+
+  if (method !== 'GET') return null;
+
+  switch (pathname) {
+    case '/api/auth/validate':
+      return validateHandler(req, ctx);
+    case '/api/auth/info':
+      return infoHandler(req, ctx);
+    case '/api/auth/permissions':
+      return permissionsHandler(req, ctx);
+    default:
+      return null;
+  }
+}

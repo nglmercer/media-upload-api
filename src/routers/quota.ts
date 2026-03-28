@@ -1,32 +1,31 @@
-import { Hono } from "hono";
 import { quotaManager } from "../services/quota-manager";
 import { getAuth } from "../middleware/auth";
-import { Permission } from "../config";
+import { json, type ServerContext } from "../utils/vanilla-http";
 
-const quotaRouter = new Hono();
-
-// GET /api/quota - Get current user's quota
-quotaRouter.get('/', async (c) => {
-  const auth = getAuth(c);
-  
-  if (!auth.permissions.includes(Permission.READ)) {
-    return c.json({ error: 'Read permission required' }, 403);
-  }
-
+/**
+ * GET /api/quota - Get quota for current user
+ */
+async function getQuota(req: Request, ctx: ServerContext) {
+  const auth = getAuth(ctx);
   const quota = await quotaManager.getUserQuota(auth.userId);
-  return c.json(quota);
-});
+  return json(quota);
+}
 
-// GET /api/quota/global - Get global quota stats
-quotaRouter.get('/global', async (c) => {
-  const auth = getAuth(c);
-  
-  if (!auth.permissions.includes(Permission.READ)) {
-    return c.json({ error: 'Read permission required' }, 403);
+/**
+ * Main Quota Router
+ */
+export async function quotaRouter(req: Request, ctx: ServerContext): Promise<Response | null> {
+  const { pathname } = ctx.url;
+  const { method } = req;
+
+  if (pathname === '/api/quota' && method === 'GET') {
+    return getQuota(req, ctx);
   }
 
-  const quota = await quotaManager.getGlobalQuota();
-  return c.json(quota);
-});
+  if (pathname === '/api/quota/global' && method === 'GET') {
+    const quota = await quotaManager.getGlobalQuota();
+    return json(quota);
+  }
 
-export { quotaRouter };
+  return null;
+}

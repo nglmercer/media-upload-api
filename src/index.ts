@@ -10,7 +10,7 @@
  * - Import app from './app' - Get the Hono app without starting server
  */
 
-export { createApp, io, config, loadConfig } from './app'
+export { handleRequest, io, config, loadConfig } from './app'
 export { startServer } from './server'
 
 // Start server when run directly

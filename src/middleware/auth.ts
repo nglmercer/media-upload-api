@@ -1,8 +1,9 @@
-import type { Context, Next } from "hono";
 import { config, Permission, type Permission as PermissionType } from "../config";
+import { json, unauthorized, forbidden } from "../utils/vanilla-http";
+import type { ServerContext } from "../utils/vanilla-http";
 
 // ============================================================================
-// Auth Context Type
+// Auth Context Type (Exported)
 // ============================================================================
 
 export interface AuthContext {
@@ -12,93 +13,80 @@ export interface AuthContext {
   tokenLabel: string | null;
 }
 
-// ============================================================================
-// Auth Middleware
-// ============================================================================
-
-export const authMiddleware = async (c: Context, next: Next) => {
+/**
+ * Vanilla Auth Middleware for Bun.serve
+ * 
+ * Returns a Response (error) or sets the 'auth' context in ctx.
+ */
+export const authMiddleware = async (req: Request, ctx: ServerContext): Promise<Response | null> => {
   const oauthConfig = config.getOAuth();
+  const url = ctx.url;
 
   // If OAuth disabled, allow all (but mark as unauthenticated with all permissions)
-  if (!oauthConfig.enabled) {
-    c.set('auth', {
+  if (!oauthConfig.enabled || !oauthConfig.tokenAuth.enabled) {
+    ctx.auth = {
       authenticated: false,
       userId: null,
       permissions: Object.values(Permission),
       tokenLabel: null,
-    });
-    await next();
-    return;
-  }
-
-  // If token auth disabled, allow all
-  if (!oauthConfig.tokenAuth.enabled) {
-    c.set('auth', {
-      authenticated: false,
-      userId: null,
-      permissions: Object.values(Permission),
-      tokenLabel: null,
-    });
-    await next();
-    return;
+    };
+    return null;
   }
 
   // Extract token from header or query
-  const token = c.req.header('X-Auth-Token') 
-    || c.req.query('token')
-    || c.req.header('Authorization')?.replace('Bearer ', '');
+  const token = req.headers.get('X-Auth-Token') 
+    || url.searchParams.get('token')
+    || req.headers.get('Authorization')?.replace('Bearer ', '');
 
   if (!token) {
-    return c.json({ error: 'Authentication required' }, 401);
+    return unauthorized('Authentication required');
   }
 
   // Validate token
   const tokenInfo = config.verifyToken(token);
   if (!tokenInfo) {
-    return c.json({ error: 'Invalid or expired token' }, 401);
+    return unauthorized('Invalid or expired token');
   }
 
   // Set auth context
-  c.set('auth', {
+  ctx.auth = {
     authenticated: true,
     userId: tokenInfo.userId,
     permissions: tokenInfo.permissions,
     tokenLabel: tokenInfo.label,
-  });
+  } as AuthContext;
 
-  await next();
+  return null;
 };
 
-// ============================================================================
-// Permission Check Helper
-// ============================================================================
-
+/**
+ * Permission Check Helper
+ */
 export const requirePermission = (...required: PermissionType[]) => {
-  return async (c: Context, next: Next) => {
-    const auth = c.get('auth') as AuthContext;
+  return async (req: Request, ctx: ServerContext): Promise<Response | null> => {
+    const auth = ctx.auth as AuthContext;
     
     const hasPermission = required.every(p => 
       auth.permissions.includes(p)
     );
     
     if (!hasPermission) {
-      return c.json({ 
+      return json({ 
         error: 'Insufficient permissions',
         required,
         has: auth.permissions,
       }, 403);
     }
     
-    await next();
+    return null;
   };
 };
 
-// ============================================================================
-// Get Auth Context Helper
-// ============================================================================
-
-export function getAuth(c: Context): AuthContext {
-  return c.get('auth') as AuthContext || {
+/**
+ * Helper to get Auth context from current request state
+ */
+export function getAuth(ctx: ServerContext): AuthContext {
+  return ctx.auth as AuthContext || {
     authenticated: false,
     userId: null,
     permissions: [],

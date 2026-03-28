@@ -1,73 +1,82 @@
-import { Hono } from 'hono'
-import { serveStatic } from 'hono/bun'
-import { cors } from 'hono/cors'
-import { logger } from 'hono/logger'
-import { io } from './websocket-adapter'
-import { config, loadConfig } from './config'
-import { authMiddleware } from './middleware/auth'
+import { io } from './websocket-adapter';
+import { config, loadConfig, createConfigFile } from './config';
+import { initFileStore } from './store/fileStore';
+import { authMiddleware } from './middleware/auth';
+import { authRouter } from './routers/auth';
+import { configRouter } from './routers/config';
+import { filesRouter } from './routers/files';
+import { quotaRouter } from './routers/quota';
+import { json, type ServerContext } from './utils/vanilla-http';
 
-// Import routers
-import { configRouter } from './routers/config'
-import { authRouter } from './routers/auth'
-import { filesRouter } from './routers/files'
-import { quotaRouter } from './routers/quota'
-
-// Initialize file store
-import { initFileStore } from './store/fileStore'
-initFileStore()
-
-// Create default config file if it doesn't exist
-import { createConfigFile } from './config'
-import { serve } from 'bun'
-createConfigFile()
+// Initialize services
+initFileStore();
+createConfigFile();
 
 /**
- * Create and configure the Hono application
- * This can be imported without starting the server
+ * Main Vanilla Request Handler
  */
-export function createApp(): Hono {
-  const app = new Hono()
+export async function handleRequest(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const ctx: ServerContext = {
+    params: {},
+    url,
+  };
 
-  app.use(logger())
-  app.use(cors({
-    origin: '*',
-  }))
+  // 1. Logger (Simple)
+  console.log(`${req.method} ${url.pathname}`);
 
-  app.get('/', (c) => {
-    return c.text('Media Upload API')
-  })
+  // 2. CORS (Simple)
+  const defaultHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Auth-Token',
+  };
 
-  // Serve uploaded files
-  app.use('/uploads/*', serveStatic({ root: './' }))
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: defaultHeaders });
+  }
 
-  // Apply auth middleware globally
-  app.use('/*', authMiddleware)
+  // 3. Static Files (Equivalent to serveStatic)
+  if (url.pathname.startsWith('/uploads/')) {
+    const filePath = `.${url.pathname}`;
+    const file = Bun.file(filePath);
+    if (await file.exists()) {
+      return new Response(file, { 
+        headers: {
+          ...defaultHeaders,
+          'Content-Type': file.type,
+        }
+      });
+    }
+  }
 
-  // Mount config routes (public + admin)
-  app.route('/api/config', configRouter)
+  // 5. Auth Middleware (Global)
+  // Note: In a real app, you might want to exclude some routes from auth.
+  const authError = await authMiddleware(req, ctx);
+  if (authError) {
+    // Apply CORS to auth error
+    for (const [key, value] of Object.entries(defaultHeaders)) {
+      authError.headers.set(key, value);
+    }
+    return authError;
+  }
 
-  // Mount auth routes
-  app.route('/api/auth', authRouter)
+  // 6. Routing
+  const routerRes = await authRouter(req, ctx) 
+    || await configRouter(req, ctx)
+    || await filesRouter(req, ctx)
+    || await quotaRouter(req, ctx);
 
-  // Mount file routes
-  app.route('/api/files', filesRouter)
+  if (routerRes) {
+    // Apply CORS headers to router response
+    for (const [key, value] of Object.entries(defaultHeaders)) {
+      routerRes.headers.set(key, value);
+    }
+    return routerRes;
+  }
 
-  // Mount quota routes
-  app.route('/api/quota', quotaRouter)
-
-  return app
+  return json({ code: 404, message: 'Not Found',info: "API is running" }, 404);
 }
 
-// Export WebSocket IO for external use
-export { io }
-
-// Export config utilities
-export { config, loadConfig }
-
-// Default export for convenience (e.g., bun run, testing)
-const app = createApp()
-serve({
-  fetch: app.fetch,
-  port: '3001',
-})
-//export default app
+// Export IO and config for server.ts compatibility
+export { io, config, loadConfig };

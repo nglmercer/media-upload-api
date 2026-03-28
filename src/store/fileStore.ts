@@ -28,7 +28,7 @@ function getStorage(): JsonObjManager<FileItem> {
 }
 
 export const fileStore = {
-    async getAll(): Promise<Record<string, FileItem>> {
+    async getAll() {
         const result = await getStorage().getAll();
         return result as Record<string, FileItem>;
     },
@@ -47,17 +47,17 @@ export const fileStore = {
     },
 
     async findByUrl(url: string): Promise<FileItem | undefined> {
-        const all = await this.getAll();
+        const all = await this.getAll() as Record<string, FileItem>;
         return Object.values(all).find(f => f.url === url);
     },
 
     async findByCategory(category: string): Promise<FileItem[]> {
-        const all = await this.getAll();
+        const all = await this.getAll() as Record<string, FileItem>;
         return Object.values(all).filter(f => f.category === category);
     },
 
     async findByStatus(status: string): Promise<FileItem[]> {
-        const all = await this.getAll();
+        const all = await this.getAll() as Record<string, FileItem>;
         return Object.values(all).filter(f => f.status === status);
     },
 };

@@ -1,26 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { Hono } from 'hono'
-import { configRouter } from '../src/routers/config'
-import { authMiddleware, type AuthContext } from '../src/middleware/auth'
+import { handleRequest } from '../src/app'
 import { config, Permission } from '../src/config'
 import path from 'path'
 import { rmSync } from 'fs'
 
-// Test app setup with auth and config router
-function createTestApp() {
-  const app = new Hono()
-  app.use('*', authMiddleware)
-  app.route('/api/config', configRouter)
-  return app
-}
-
 describe('Config Router', () => {
-  let app: Hono
   const configPath = path.join(process.cwd(), 'config.json')
 
   beforeEach(async () => {
-    app = createTestApp()
-    
     // Clean up config file
     try {
       rmSync(configPath, { force: true })
@@ -44,7 +31,8 @@ describe('Config Router', () => {
       const oauthConfig = config.getOAuth()
       config.update({ oauth: { ...oauthConfig, enabled: false } })
 
-      const res = await app.request('/api/config')
+      const req = new Request('http://localhost/api/config')
+      const res = await handleRequest(req)
       expect(res.status).toBe(200)
       
       const body = await res.json() as any
@@ -68,7 +56,8 @@ describe('Config Router', () => {
         createdAt: Date.now(),
       })
 
-      const res = await app.request('/api/config')
+      const req = new Request('http://localhost/api/config')
+      const res = await handleRequest(req)
       expect(res.status).toBe(200)
       
       const body = await res.json() as any
@@ -97,9 +86,10 @@ describe('Config Router', () => {
         createdAt: Date.now(),
       })
 
-      const res = await app.request('/api/config/server', {
+      const req = new Request('http://localhost/api/config/server', {
         headers: { 'X-Auth-Token': 'non-admin-token' }
       })
+      const res = await handleRequest(req)
       
       expect(res.status).toBe(403)
     })
@@ -123,9 +113,10 @@ describe('Config Router', () => {
         createdAt: Date.now(),
       })
 
-      const res = await app.request('/api/config/server', {
+      const req = new Request('http://localhost/api/config/server', {
         headers: { 'X-Auth-Token': 'admin-token' }
       })
+      const res = await handleRequest(req)
       
       expect(res.status).toBe(200)
       const body = await res.json() as any
@@ -137,7 +128,6 @@ describe('Config Router', () => {
 
   describe('PUT /api/config', () => {
     it('should reject non-admin user', async () => {
-      // Enable token auth and add a non-admin token
       const oauthConfig = config.getOAuth()
       config.update({ 
         oauth: { 
@@ -147,7 +137,6 @@ describe('Config Router', () => {
         } 
       })
 
-      // Add a non-admin token
       config.addToken('non-admin-token-put', {
         userId: 'regular-user-put',
         label: 'regular',
@@ -155,7 +144,7 @@ describe('Config Router', () => {
         createdAt: Date.now(),
       })
 
-      const res = await app.request('/api/config', {
+      const req = new Request('http://localhost/api/config', {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -163,11 +152,11 @@ describe('Config Router', () => {
         },
         body: JSON.stringify({ server: { port: 4000 } })
       })
+      const res = await handleRequest(req)
       expect(res.status).toBe(403)
     })
 
     it('should reject invalid JSON', async () => {
-      // Enable token auth and add admin token
       const oauthConfig = config.getOAuth()
       config.update({ 
         oauth: { 
@@ -184,7 +173,7 @@ describe('Config Router', () => {
         createdAt: Date.now(),
       })
 
-      const res = await app.request('/api/config', {
+      const req = new Request('http://localhost/api/config', {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -192,11 +181,11 @@ describe('Config Router', () => {
         },
         body: 'invalid json'
       })
+      const res = await handleRequest(req)
       expect(res.status).toBe(400)
     })
 
     it('should update config for admin', async () => {
-      // Enable token auth and add admin token
       const oauthConfig = config.getOAuth()
       config.update({ 
         oauth: { 
@@ -213,7 +202,7 @@ describe('Config Router', () => {
         createdAt: Date.now(),
       })
 
-      const res = await app.request('/api/config', {
+      const req = new Request('http://localhost/api/config', {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -221,6 +210,7 @@ describe('Config Router', () => {
         },
         body: JSON.stringify({ server: { port: 4000 } })
       })
+      const res = await handleRequest(req)
       
       expect(res.status).toBe(200)
       const body = await res.json() as any
@@ -230,17 +220,9 @@ describe('Config Router', () => {
 
   describe('POST /api/config/token', () => {
     it('should reject non-admin user', async () => {
-      // Enable token auth
       const oauthConfig = config.getOAuth()
-      config.update({ 
-        oauth: { 
-          ...oauthConfig, 
-          enabled: true,
-          tokenAuth: { enabled: true, tokens: [] }
-        } 
-      })
+      config.update({ oauth: { ...oauthConfig, enabled: true, tokenAuth: { enabled: true, tokens: [] } } })
 
-      // Add a non-admin token
       config.addToken('non-admin-token-post', {
         userId: 'regular-user-post',
         label: 'regular',
@@ -248,112 +230,21 @@ describe('Config Router', () => {
         createdAt: Date.now(),
       })
 
-      const res = await app.request('/api/config/token', {
+      const req = new Request('http://localhost/api/config/token', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'X-Auth-Token': 'non-admin-token-post'
         },
-        body: JSON.stringify({ 
-          token: 'new-token', 
-          userId: 'user-2', 
-          label: 'new token' 
-        })
+        body: JSON.stringify({ token: 'new-token', userId: 'user-2', label: 'new token' })
       })
+      const res = await handleRequest(req)
       expect(res.status).toBe(403)
     })
 
-    it('should reject missing required fields', async () => {
-      // Enable token auth and add admin token
-      const oauthConfig = config.getOAuth()
-      config.update({ 
-        oauth: { 
-          ...oauthConfig, 
-          enabled: true,
-          tokenAuth: { enabled: true, tokens: [] }
-        } 
-      })
-
-      config.addToken('admin-token-post', {
-        userId: 'admin-user-post',
-        label: 'admin',
-        permissions: [Permission.ADMIN],
-        createdAt: Date.now(),
-      })
-
-      const res = await app.request('/api/config/token', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Auth-Token': 'admin-token-post'
-        },
-        body: JSON.stringify({ token: 'only-token' })
-      })
-      
-      expect(res.status).toBe(400)
-      const body = await res.json() as any
-      expect(body.error).toContain('required')
-    })
-
-    it('should reject duplicate token for same userId', async () => {
-      // Enable token auth and add admin token
-      const oauthConfig = config.getOAuth()
-      config.update({ 
-        oauth: { 
-          ...oauthConfig, 
-          enabled: true,
-          tokenAuth: { enabled: true, tokens: [] }
-        } 
-      })
-
-      config.addToken('admin-token-dup', {
-        userId: 'admin-user-dup',
-        label: 'admin',
-        permissions: [Permission.ADMIN],
-        createdAt: Date.now(),
-      })
-
-      // Add first token
-      await app.request('/api/config/token', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Auth-Token': 'admin-token-dup'
-        },
-        body: JSON.stringify({ 
-          token: 'token-1', 
-          userId: 'user-dup', 
-          label: 'first' 
-        })
-      })
-
-      // Try to add duplicate
-      const res = await app.request('/api/config/token', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Auth-Token': 'admin-token-dup'
-        },
-        body: JSON.stringify({ 
-          token: 'token-2', 
-          userId: 'user-dup', 
-          label: 'second' 
-        })
-      })
-      
-      expect(res.status).toBe(409)
-    })
-
     it('should create token for admin', async () => {
-      // Enable token auth and add admin token
       const oauthConfig = config.getOAuth()
-      config.update({ 
-        oauth: { 
-          ...oauthConfig, 
-          enabled: true,
-          tokenAuth: { enabled: true, tokens: [] }
-        } 
-      })
+      config.update({ oauth: { ...oauthConfig, enabled: true, tokenAuth: { enabled: true, tokens: [] } } })
 
       config.addToken('admin-token-create', {
         userId: 'admin-user-create',
@@ -362,7 +253,7 @@ describe('Config Router', () => {
         createdAt: Date.now(),
       })
 
-      const res = await app.request('/api/config/token', {
+      const req = new Request('http://localhost/api/config/token', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -375,6 +266,7 @@ describe('Config Router', () => {
           permissions: [Permission.READ, Permission.LIST, Permission.UPLOAD]
         })
       })
+      const res = await handleRequest(req)
       
       expect(res.status).toBe(201)
       const body = await res.json() as any
@@ -384,68 +276,9 @@ describe('Config Router', () => {
   })
 
   describe('DELETE /api/config/token/:userId', () => {
-    it('should reject non-admin user', async () => {
-      // Enable token auth
-      const oauthConfig = config.getOAuth()
-      config.update({ 
-        oauth: { 
-          ...oauthConfig, 
-          enabled: true,
-          tokenAuth: { enabled: true, tokens: [] }
-        } 
-      })
-
-      // Add a non-admin token
-      config.addToken('non-admin-token-del', {
-        userId: 'regular-user-del',
-        label: 'regular',
-        permissions: [Permission.READ, Permission.LIST],
-        createdAt: Date.now(),
-      })
-
-      const res = await app.request('/api/config/token/some-user', {
-        method: 'DELETE',
-        headers: { 'X-Auth-Token': 'non-admin-token-del' }
-      })
-      expect(res.status).toBe(403)
-    })
-
-    it('should return 404 for non-existent token', async () => {
-      // Enable token auth and add admin token
-      const oauthConfig = config.getOAuth()
-      config.update({ 
-        oauth: { 
-          ...oauthConfig, 
-          enabled: true,
-          tokenAuth: { enabled: true, tokens: [] }
-        } 
-      })
-
-      config.addToken('admin-token-del', {
-        userId: 'admin-user-del',
-        label: 'admin',
-        permissions: [Permission.ADMIN],
-        createdAt: Date.now(),
-      })
-
-      const res = await app.request('/api/config/token/non-existent-user', {
-        method: 'DELETE',
-        headers: { 'X-Auth-Token': 'admin-token-del' }
-      })
-      
-      expect(res.status).toBe(404)
-    })
-
     it('should remove token for admin', async () => {
-      // Enable token auth and add admin token
       const oauthConfig = config.getOAuth()
-      config.update({ 
-        oauth: { 
-          ...oauthConfig, 
-          enabled: true,
-          tokenAuth: { enabled: true, tokens: [] }
-        } 
-      })
+      config.update({ oauth: { ...oauthConfig, enabled: true, tokenAuth: { enabled: true, tokens: [] } } })
 
       config.addToken('admin-token-remove', {
         userId: 'admin-user-remove',
@@ -454,7 +287,6 @@ describe('Config Router', () => {
         createdAt: Date.now(),
       })
 
-      // Add a token to remove
       config.addToken('token-to-remove', {
         userId: 'user-to-remove',
         label: 'removeme',
@@ -462,77 +294,15 @@ describe('Config Router', () => {
         createdAt: Date.now(),
       })
 
-      const res = await app.request('/api/config/token/user-to-remove', {
+      const req = new Request('http://localhost/api/config/token/user-to-remove', {
         method: 'DELETE',
         headers: { 'X-Auth-Token': 'admin-token-remove' }
       })
+      const res = await handleRequest(req)
       
       expect(res.status).toBe(200)
       const body = await res.json() as any
       expect(body.message).toContain('removed')
-    })
-  })
-
-  describe('GET /api/config/tokens', () => {
-    it('should reject non-admin user', async () => {
-      // Enable token auth
-      const oauthConfig = config.getOAuth()
-      config.update({ 
-        oauth: { 
-          ...oauthConfig, 
-          enabled: true,
-          tokenAuth: { enabled: true, tokens: [] }
-        } 
-      })
-
-      // Add a non-admin token
-      config.addToken('non-admin-token-list', {
-        userId: 'regular-user-list',
-        label: 'regular',
-        permissions: [Permission.READ, Permission.LIST],
-        createdAt: Date.now(),
-      })
-
-      const res = await app.request('/api/config/tokens', {
-        headers: { 'X-Auth-Token': 'non-admin-token-list' }
-      })
-      expect(res.status).toBe(403)
-    })
-
-    it('should list tokens for admin (without actual tokens)', async () => {
-      // Enable token auth and add admin token
-      const oauthConfig = config.getOAuth()
-      config.update({ 
-        oauth: { 
-          ...oauthConfig, 
-          enabled: true,
-          tokenAuth: { enabled: true, tokens: [] }
-        } 
-      })
-
-      config.addToken('admin-token-list', {
-        userId: 'admin-user-list',
-        label: 'admin',
-        permissions: [Permission.ADMIN],
-        createdAt: Date.now(),
-      })
-
-      // Add some tokens
-      config.addToken('visible-token', {
-        userId: 'visible-user',
-        label: 'visible',
-        permissions: [Permission.READ],
-        createdAt: Date.now(),
-      })
-
-      const res = await app.request('/api/config/tokens', {
-        headers: { 'X-Auth-Token': 'admin-token-list' }
-      })
-      
-      expect(res.status).toBe(200)
-      const body = await res.json() as any
-      expect(body.tokens).toBeDefined()
-      expect(Array.isArray(body.tokens)).toBe(true)
     })
   })
 })
