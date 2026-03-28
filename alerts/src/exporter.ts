@@ -18,6 +18,7 @@ function cleanElement(el: any) {
   if (el.src !== undefined) cleaned.src = el.src;
   if (el.alt !== undefined) cleaned.alt = el.alt;
   if (el.markdown !== undefined) cleaned.markdown = el.markdown;
+  if (el.html !== undefined) cleaned.html = el.html;
   if (el.style) cleaned.style = typeof el.style === 'function' ? undefined : el.style;
   if (el.behavior) cleaned.behavior = el.behavior;
   if (el.behaviorData) cleaned.behaviorData = el.behaviorData;

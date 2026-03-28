@@ -59,6 +59,8 @@ export interface AlertElementStyle {
   borderBottom?: string;
   borderLeft?: string;
   boxShadow?: string;
+  textShadow?: string;
+  objectFit?: 'fill' | 'contain' | 'cover' | 'none' | 'scale-down';
   opacity?: number;
   overflow?: 'visible' | 'hidden' | 'scroll' | 'auto';
   overflowX?: 'visible' | 'hidden' | 'scroll' | 'auto';
@@ -156,6 +158,7 @@ export interface AlertTextElement {
   id: string;
   content: string;
   markdown?: boolean;
+  html?: boolean;
   style?: AlertElementStyle;
   animation?: AlertElementAnimation;
   interaction?: AlertElementInteraction;
@@ -407,6 +410,8 @@ export function elementStyleToCSS(style: AlertElementStyle): string {
   if (style.borderBottom) css.push(`border-bottom: ${style.borderBottom}`);
   if (style.borderLeft) css.push(`border-left: ${style.borderLeft}`);
   if (style.boxShadow) css.push(`box-shadow: ${style.boxShadow}`);
+  if (style.textShadow) css.push(`text-shadow: ${style.textShadow}`);
+  if (style.objectFit) css.push(`object-fit: ${style.objectFit}`);
   if (style.opacity !== undefined) css.push(`opacity: ${style.opacity}`);
   if (style.overflow) css.push(`overflow: ${style.overflow}`);
   if (style.overflowX) css.push(`overflow-x: ${style.overflowX}`);

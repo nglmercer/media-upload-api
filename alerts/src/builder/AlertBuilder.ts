@@ -46,6 +46,7 @@ export class AlertBuilder {
   text(content: string, options?: {
     id?: string;
     markdown?: boolean;
+    html?: boolean;
     style?: AlertElementStyle;
     animation?: AlertElementAnimation;
     interaction?: AlertElementInteraction;
@@ -58,6 +59,7 @@ export class AlertBuilder {
       id: options?.id || generateId(),
       content,
       markdown: options?.markdown,
+      html: options?.html,
       style: options?.style,
       animation: options?.animation,
       interaction: options?.interaction,

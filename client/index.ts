@@ -115,20 +115,21 @@ export class MediaLibrary extends LitElement {
       this.items = result.files.filter(f => {
         if (!f.mimeType) return false;
         if (this.type === 'image') {
-          return f.mimeType.startsWith('image/') || f.mimeType.startsWith('video/');
+          return f.mimeType.startsWith('image/');
         }
         if (this.type === 'sound') {
           return f.mimeType.startsWith('audio/') ||
                  f.mimeType.includes('ogg') ||
-                 f.mimeType.includes('wav') ||
-                 f.mimeType.startsWith('video/');
+                 f.mimeType.includes('wav');
         }
-        // video type - only videos
-        return f.mimeType.startsWith('video/');
+        if (this.type === 'video') {
+          return f.mimeType.startsWith('video/');
+        }
+        return true;
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[MediaLibrary] fetchFiles:', err);
-      this.error = err.message ?? 'Error fetching files';
+      this.error = err instanceof Error ? err.message : 'Error fetching files';
     } finally {
       this.loading = false;
     }
@@ -303,7 +304,7 @@ export class MediaLibrary extends LitElement {
 
     this.onSelect(url, name);
     this.dispatchEvent(new CustomEvent('media-select', {
-      detail: { url, name },
+      detail: { url, name, selected },
       bubbles: true,
       composed: true,
     }));

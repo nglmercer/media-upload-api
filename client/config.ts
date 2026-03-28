@@ -24,6 +24,16 @@ export function resolveServiceUrl(name: string, fallback?: string): string {
   return fallback || getBackendUrl();
 }
 
+export function resolveMediaUrl(url: string | undefined): string | undefined {
+  if (!url || typeof url !== 'string' || url === '') return url;
+  if (url.startsWith('http')) return url;
+  
+  const backendUrl = getBackendUrl();
+  const cleanBase = backendUrl.replace(/\/$/, '');
+  const cleanPath = url.startsWith('/') ? url : '/' + url;
+  return cleanBase + cleanPath;
+}
+
 export function normalizeMediaUrl(url: string | undefined): string | undefined {
   if (!url || typeof url !== 'string' || url === '') return url;
   if (!url.startsWith('http')) return url;

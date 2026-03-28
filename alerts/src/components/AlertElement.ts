@@ -138,6 +138,10 @@ export class AlertElementComponent extends LitElement {
   }
 
   private renderText(element: AlertTextElement) {
+    if (element.html) {
+      return html`<div class="text html">${unsafeHTML(element.content)}</div>`;
+    }
+    
     const content = element.markdown 
       ? this.parseMarkdown(element.content)
       : element.content;
