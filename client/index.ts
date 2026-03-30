@@ -1,18 +1,28 @@
 import { html, LitElement } from 'lit';
 import { Component, property, state } from './components/litcomponents';
 import { LocalizeController } from './locales/locales';
-import { createBrowserClient } from '../src/client/index'
-import type { FileItem,FileTypes } from '../src/client/index';
+import { createBrowserClient } from '../src/client/index';
+import type { FileItem, MediaUploadClient, FileTypes } from '../src/client/index';
 import { FileCategory } from '../src/client/index';
 import { confirm } from './components/alerts';
 import { mediaLibraryStyles } from './styles';
-// Register sub-component
 import './components/itemlibrary';
 import type { MediaLibraryItem } from './components/itemlibrary';
 import { resolveServiceUrl, normalizeMediaUrl } from './config';
-import type { MediaUploadClient } from '../src/client/index';
 import { WidgetEvents, WidgetEventTypes } from './events';
 
+/**
+ * MediaLibrary — UI component for browsing, uploading, and selecting media.
+ *
+ * Uses the SDK client from `src/client` directly.
+ * For headless (no-UI) usage, instantiate `createBrowserClient` directly
+ * and expose it on `window` — see `index.html` for examples.
+ *
+ * @example
+ * ```html
+ * <media-library type="image"></media-library>
+ * ```
+ */
 @Component('media-library')
 export class MediaLibrary extends LitElement {
   // ── Public API ──────────────────────────────────────────────────────────
@@ -55,7 +65,7 @@ export class MediaLibrary extends LitElement {
   @state() private playingItemId: string | null = null;
 
   private readonly ITEMS_PER_PAGE = 6;
-  private _localize = new LocalizeController(this);
+  private _localize: LocalizeController = new LocalizeController(this);
 
   // ── Styles ──────────────────────────────────────────────────────────────
   static styles = mediaLibraryStyles;
@@ -69,13 +79,11 @@ export class MediaLibrary extends LitElement {
     this.fetchFiles();
     this.fetchQuota();
 
-    // Emit global open event
     WidgetEvents.emit(WidgetEventTypes.ML_OPEN, { type: this.type });
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    // Emit global close event
     WidgetEvents.emit(WidgetEventTypes.ML_CLOSE, {});
   }
 
@@ -98,7 +106,6 @@ export class MediaLibrary extends LitElement {
 
     this.selectedItem = match.id;
 
-    // Jump to the page that contains the pre-selected item
     const ordered = this._filteredAndSorted();
     const idx = ordered.findIndex(i => i.id === match.id);
     if (idx >= 0) {
@@ -115,17 +122,11 @@ export class MediaLibrary extends LitElement {
       const result = await this.apiClient.files.list({ pageSize: 100 });
       this.items = result.files.filter(f => {
         if (!f.mimeType) return false;
-        if (this.type === 'image') {
-          return f.mimeType.startsWith('image/');
-        }
+        if (this.type === 'image') return f.mimeType.startsWith('image/');
         if (this.type === 'sound') {
-          return f.mimeType.startsWith('audio/') ||
-                 f.mimeType.includes('ogg') ||
-                 f.mimeType.includes('wav');
+          return f.mimeType.startsWith('audio/') || f.mimeType.includes('ogg') || f.mimeType.includes('wav');
         }
-        if (this.type === 'video') {
-          return f.mimeType.startsWith('video/');
-        }
+        if (this.type === 'video') return f.mimeType.startsWith('video/');
         return true;
       });
     } catch (err: unknown) {
@@ -156,7 +157,6 @@ export class MediaLibrary extends LitElement {
   private handleDragLeave(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
-    // Only set to false if we're leaving the modal entirely
     const rect = this.getBoundingClientRect();
     const x = e.clientX;
     const y = e.clientY;
@@ -184,7 +184,6 @@ export class MediaLibrary extends LitElement {
   private async processFiles(files: File[]) {
     if (!files.length) return;
 
-    // Initialize upload queue with all files
     this.uploadQueue = files.map(file => ({
       file,
       progress: 0,
@@ -196,7 +195,6 @@ export class MediaLibrary extends LitElement {
 
     WidgetEvents.emit(WidgetEventTypes.ML_UPLOAD_START, { count: files.length });
 
-    // Upload files in parallel with progress tracking
     const uploadPromises = files.map(async (file, index) => {
       try {
         let category: FileTypes = FileCategory.OTHER;
@@ -204,7 +202,6 @@ export class MediaLibrary extends LitElement {
         else if (file.type.startsWith('video/')) category = FileCategory.VIDEO;
         else if (file.type.startsWith('audio/')) category = FileCategory.AUDIO;
 
-        // Simulate progress updates (the actual API might handle this differently)
         this.uploadQueue = this.uploadQueue.map((item, i) =>
           i === index ? { ...item, progress: 50 } : item
         );
@@ -232,7 +229,6 @@ export class MediaLibrary extends LitElement {
       this.error = err.message ?? 'Error uploading files';
       WidgetEvents.emit(WidgetEventTypes.ML_UPLOAD_ERROR, { fileName: '', error: err.message });
     } finally {
-      // Clear queue after a short delay to show completion
       setTimeout(() => {
         this.uploadQueue = [];
         this.uploading = false;
@@ -246,7 +242,7 @@ export class MediaLibrary extends LitElement {
 
     const files = Array.from(input.files);
     this.processFiles(files);
-    input.value = ''; // Reset input to allow re-uploading same file
+    input.value = '';
   }
 
   private async handleDelete(e: CustomEvent<{ id: string }>) {
@@ -263,25 +259,13 @@ export class MediaLibrary extends LitElement {
     }
   }
 
-  /**
-   * Handle item selection from ml-select event.
-   * Signals the previously-playing item to stop via property change —
-   * MediaLibraryItem watches `playingExternal` to stop itself.
-   * This avoids queryAll across shadow DOM boundaries.
-   */
   private handleItemSelect(e: CustomEvent<{ item: FileItem }>) {
     const { item } = e.detail;
     this.selectedItem = item.id;
   }
 
-  /**
-   * Audio state is managed inside MediaLibraryItem.
-   * The parent tracks which item is "playing" via this event so it can
-   * tell previously-playing cards to stop when a new one starts.
-   */
   private handleItemPlayStart(e: CustomEvent<{ id: string }>) {
     if (this.playingItemId && this.playingItemId !== e.detail.id) {
-      // Find the old playing element and stop it via a custom event
       const old = this.shadowRoot?.querySelector(
         `media-library-item[data-id="${this.playingItemId}"]`
       ) as MediaLibraryItem | null;
@@ -417,7 +401,6 @@ export class MediaLibrary extends LitElement {
   private renderStatsBar() {
     const hasUploads = this.uploadQueue.length > 0;
     const completedCount = this.uploadQueue.filter(u => u.completed).length;
-    const errorCount = this.uploadQueue.filter(u => u.error).length;
 
     return html`
       <div class="stats-bar">
@@ -458,11 +441,11 @@ export class MediaLibrary extends LitElement {
       <div class="upload-progress">
         <div class="upload-progress-header">
           <span class="upload-progress-title">
-            ${this.uploadQueue.some(u => u.completed) 
+            ${this.uploadQueue.some(u => u.completed)
               ? `Uploaded ${this.uploadQueue.filter(u => u.completed).length} of ${this.uploadQueue.length} files`
               : `Uploading ${this.uploadQueue.length} file(s)...`}
           </span>
-          ${this.uploadQueue.some(u => u.error) 
+          ${this.uploadQueue.some(u => u.error)
             ? html`<span class="upload-progress-error">${this.uploadQueue.filter(u => u.error).length} failed</span>`
             : ''}
         </div>
@@ -486,11 +469,9 @@ export class MediaLibrary extends LitElement {
               </div>
               <div class="upload-item-info">
                 <span class="upload-item-name">${item.file.name}</span>
-                ${item.error 
+                ${item.error
                   ? html`<span class="upload-item-error">${item.error}</span>`
-                  : item.completed
-                    ? html`<span class="upload-item-size">${this.formatBytes(item.file.size)}</span>`
-                    : html`<span class="upload-item-size">${this.formatBytes(item.file.size)}</span>`
+                  : html`<span class="upload-item-size">${this.formatBytes(item.file.size)}</span>`
                 }
               </div>
               ${!item.completed && !item.error ? html`
@@ -582,13 +563,12 @@ export class MediaLibrary extends LitElement {
   render() {
     const allItems   = this._filteredAndSorted();
     const totalPages = Math.max(1, Math.ceil(allItems.length / this.ITEMS_PER_PAGE));
-    // Clamp page safely — use Math.min, not mutation inside render
     const safePage   = Math.min(this.currentPage, totalPages);
     const start      = (safePage - 1) * this.ITEMS_PER_PAGE;
     const pageItems  = allItems.slice(start, start + this.ITEMS_PER_PAGE);
 
     return html`
-      <div 
+      <div
         class="modal ${this.isDragging ? 'dragging' : ''}"
         @dragenter="${this.handleDragEnter}"
         @dragleave="${this.handleDragLeave}"
