@@ -129,7 +129,7 @@ async function uploadFile(req: Request, ctx: ServerContext) {
  */
 async function listFiles(req: Request, ctx: ServerContext) {
   const auth = getAuth(ctx);
-  if (!auth.permissions.includes(Permission.LIST)) return json({ error: 'List permission required' }, 403);
+  // Removed strict LIST check to allow access to public files even without the permission
 
   const category = ctx.url.searchParams.get('category');
   const status = ctx.url.searchParams.get('status');

@@ -19,11 +19,15 @@ export class AuthRegister extends LitElement {
             flex: 1;
             display: flex;
             flex-direction: column;
+            height: 100%;
         }
         .form-container {
             flex: 1;
             display: flex;
             flex-direction: column;
+            justify-content: center;
+            position: relative;
+            height: 100%;
         }
         h2 { 
             margin-top: 0; 
@@ -50,6 +54,12 @@ export class AuthRegister extends LitElement {
         input:focus {
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(192, 38, 211, 0.1);
+        }
+        .inputs {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex: auto;
         }
         .actions {
             margin-top: auto;
@@ -90,7 +100,7 @@ export class AuthRegister extends LitElement {
         }
         .footer {
             text-align: center;
-            margin-top: 25px;
+            margin-top: auto;
             font-size: 0.9em;
             color: var(--text-muted);
         }
@@ -126,14 +136,16 @@ export class AuthRegister extends LitElement {
     render() {
         return html`
             <div class="form-container">
-                <div class="input-group">
-                    <input type="text" placeholder="${this.i18n.t('auth.username')}" @input=${(e: any) => this.username = e.target.value}>
-                </div>
-                <div class="input-group">
-                    <input type="email" placeholder="${this.i18n.t('auth.email')}" @input=${(e: any) => this.email = e.target.value}>
-                </div>
-                <div class="input-group">
-                    <input type="password" placeholder="${this.i18n.t('auth.password')}" @input=${(e: any) => this.password = e.target.value}>
+                <div class="inputs">
+                    <div class="input-group">
+                        <input type="text" placeholder="${this.i18n.t('auth.username')}" @input=${(e: any) => this.username = e.target.value}>
+                    </div>
+                    <div class="input-group">
+                        <input type="email" placeholder="${this.i18n.t('auth.email')}" @input=${(e: any) => this.email = e.target.value}>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" placeholder="${this.i18n.t('auth.password')}" @input=${(e: any) => this.password = e.target.value}>
+                    </div>
                 </div>
                 
                 <div class="actions">

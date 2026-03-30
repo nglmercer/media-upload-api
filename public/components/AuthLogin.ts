@@ -18,11 +18,15 @@ export class AuthLogin extends LitElement {
             flex: 1;
             display: flex;
             flex-direction: column;
+            height: 100%;
         }
         .form-container {
             flex: 1;
             display: flex;
             flex-direction: column;
+            justify-content: center;
+            position: relative;
+            height: 100%;
         }
         h2 { 
             margin-top: 0; 
@@ -69,6 +73,12 @@ export class AuthLogin extends LitElement {
         .actions {
             margin-top: auto;
         }
+        .inputs {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex: auto;
+        }
         button { 
             width: 100%; 
             padding: 16px; 
@@ -104,7 +114,7 @@ export class AuthLogin extends LitElement {
         }
         .footer {
             text-align: center;
-            margin-top: 25px;
+            margin-top: auto;
             font-size: 0.9em;
             color: var(--text-muted);
         }
@@ -140,14 +150,16 @@ export class AuthLogin extends LitElement {
     render() {
         return html`
             <div class="form-container">
-                <div class="input-group">
-                    <input type="text" placeholder="${this.i18n.t('auth.identifier')}" @input=${(e: any) => this.identifier = e.target.value}>
-                </div>
-                <div class="input-group">
-                    <input type="password" placeholder="${this.i18n.t('auth.password')}" @input=${(e: any) => this.password = e.target.value}>
-                </div>
-                <div class="forgot">
-                    <a href="#">${this.i18n.t('auth.forgotPassword')}</a>
+                <div class="inputs">
+                    <div class="input-group">
+                        <input type="text" placeholder="${this.i18n.t('auth.identifier')}" @input=${(e: any) => this.identifier = e.target.value}>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" placeholder="${this.i18n.t('auth.password')}" @input=${(e: any) => this.password = e.target.value}>
+                    </div>
+                    <div class="forgot">
+                        <a href="#">${this.i18n.t('auth.forgotPassword')}</a>
+                    </div>
                 </div>
                 
                 <div class="actions">

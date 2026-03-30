@@ -64,7 +64,8 @@ export class MediaLibrary extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     const baseUrl = resolveServiceUrl('media-upload-api');
-    this.apiClient = createBrowserClient({ baseUrl });
+    const token = localStorage.getItem('session_id') || undefined;
+    this.apiClient = createBrowserClient({ baseUrl, token });
     this.fetchFiles();
     this.fetchQuota();
 
