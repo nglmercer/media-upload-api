@@ -24,6 +24,7 @@
   "dependencies": {
     "@lit/localize": "^0.12.2",
     "animejs": "^4.3.6",
+    "drizzle-orm": "^0.45.2",
     "file-type": "^21.1.1",
     "json-obj-manager": "^3.6.0",
     "lit": "^3.3.2",
@@ -31,6 +32,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "drizzle-kit": "^0.31.10"
   }
 }
