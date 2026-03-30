@@ -250,6 +250,7 @@ export const FileItemSchema = z.object({
   status: FileStatusSchema,
   flags: z.array(ValidationFlagSchema),
   url: z.string(),
+  isPublic: z.boolean().default(true),
   storagePath: z.string(),
   integrity: z.object({
     sha256: z.string().regex(/^[a-f0-9]{64}$/),

@@ -88,6 +88,7 @@ async function uploadFile(req: Request, ctx: ServerContext) {
   await Bun.write(filePath, file);
 
   const url = `/uploads/${getDirectoryForCategory(fileCategory)}/${fileName}`;
+  const isPublic = formData.get('isPublic') !== 'false'; // Default to true
 
   const fileRecord: FileItem = {
     id,
@@ -101,6 +102,7 @@ async function uploadFile(req: Request, ctx: ServerContext) {
     status: status as FileItem['status'],
     flags: validation.flags,
     url,
+    isPublic,
     storagePath: filePath,
     integrity: { sha256: validation.integrity.sha256 },
     metadata: {},
@@ -135,6 +137,12 @@ async function listFiles(req: Request, ctx: ServerContext) {
   const pageSize = parseInt(ctx.url.searchParams.get('pageSize') || '50');
 
   let files = Object.values(await fileStore.getAll());
+  
+  // Apply permission filtering: if not authorized to list all, only show public ones
+  if (!auth.permissions.includes(Permission.LIST)) {
+    files = files.filter(f => f.isPublic);
+  }
+
   if (category) files = files.filter(f => f.category === category);
   if (status) files = files.filter(f => f.status === status);
   files = files.filter(f => f.status !== FileStatus.DELETED);
@@ -156,10 +164,11 @@ async function listFiles(req: Request, ctx: ServerContext) {
  */
 async function downloadFile(req: Request, ctx: ServerContext) {
   const auth = getAuth(ctx);
-  if (!auth.permissions.includes(Permission.READ)) return json({ error: 'Read permission required' }, 403);
-
   const file = await fileStore.get(ctx.params.id);
   if (!file || file.status === FileStatus.DELETED) return json({ error: 'File not found' }, 404);
+
+  const canRead = file.isPublic || auth.permissions.includes(Permission.READ);
+  if (!canRead) return json({ error: 'Read permission required' }, 403);
 
   try {
     const data = await readFile(file.storagePath);
@@ -201,9 +210,16 @@ export async function filesRouter(req: Request, ctx: ServerContext): Promise<Res
     ctx.params = { ...ctx.params, ...params };
     if (method === 'GET') {
       const auth = getAuth(ctx);
-      if (!auth.permissions.includes(Permission.READ)) return json({ error: 'Read permission required' }, 403);
       const file = await fileStore.get(params.id);
-      return file ? json(file) : json({ error: 'File not found' }, 404);
+      
+      if (!file || file.status === FileStatus.DELETED) {
+        return json({ error: 'File not found' }, 404);
+      }
+
+      const canRead = file.isPublic || auth.permissions.includes(Permission.READ);
+      if (!canRead) return json({ error: 'Read permission required' }, 403);
+
+      return json(file);
     }
     if (method === 'DELETE') {
        const auth = getAuth(ctx);

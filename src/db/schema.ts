@@ -43,6 +43,7 @@ export const files = sqliteTable("files", {
   status: text("status").notNull(), // FileStatus
   flags: text("flags", { mode: "json" }).notNull().$type<string[]>(),
   url: text("url").notNull(),
+  isPublic: integer("is_public", { mode: "boolean" }).notNull().default(true),
   storagePath: text("storage_path").notNull(),
   integrity: text("integrity", { mode: "json" }).notNull().$type<{ sha256: string }>(),
   metadata: text("metadata", { mode: "json" }).$type<Record<string, any>>(),

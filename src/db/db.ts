@@ -47,6 +47,7 @@ sqlite.run(`
     status TEXT NOT NULL,
     flags TEXT NOT NULL,
     url TEXT NOT NULL,
+    is_public INTEGER NOT NULL DEFAULT 1,
     storage_path TEXT NOT NULL,
     integrity TEXT NOT NULL,
     metadata TEXT,
