@@ -24,14 +24,14 @@
  * @module lib/dialog
  */
 
-import { DialogOptions, DialogTheme, DialogResult } from './Dialog';
-
+import { DialogOptions, DialogTheme, DialogResult,AppDialog } from './Dialog';
+console.log(AppDialog)
 /**
  * Module-level state
  */
 
 /** Cached reference to the dialog element */
-let dialogElement: import('./Dialog').AppDialog | null = null;
+let dialogElement: AppDialog | null = null;
 
 /** Default theme for new dialogs */
 let defaultTheme: DialogTheme = 'dark';
@@ -44,9 +44,9 @@ let defaultTheme: DialogTheme = 'dark';
  * 
  * @returns The AppDialog element
  */
-function getDialogElement(): import('./Dialog').AppDialog {
+function getDialogElement(): AppDialog {
   if (!dialogElement) {
-    dialogElement = document.createElement('app-dialog') as import('./Dialog').AppDialog;
+    dialogElement = document.createElement('app-dialog') as AppDialog;
     document.body.appendChild(dialogElement);
   }
   return dialogElement;

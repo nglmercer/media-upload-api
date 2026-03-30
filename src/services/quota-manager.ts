@@ -1,5 +1,6 @@
-import fs from 'fs';
-import path from 'path';
+import { db } from '../db/db';
+import { quota as quotaTable } from '../db/schema';
+import { eq } from 'drizzle-orm';
 import { config } from '../config';
 import type { FileCategory, SecurityCategory } from '../types/file';
 
@@ -70,12 +71,6 @@ const DEFAULT_USAGE_STATS: UsageStats = {
 // ============================================================================
 
 export class QuotaManager {
-  private usageCache: Map<string, UsageStats> = new Map();
-  
-  private getDataDir(): string {
-    return config.getServer().dataDir;
-  }
-  
   async getUserQuota(userId: string | null): Promise<QuotaInfo> {
     const quotaConfig = config.getQuota();
     const usage = await this.getUsage(userId);
@@ -219,19 +214,10 @@ export class QuotaManager {
   private async getUsage(userId: string | null): Promise<UsageStats> {
     const key = userId || '_global';
     
-    if (this.usageCache.has(key)) {
-      return this.usageCache.get(key)!;
-    }
-    
-    // Load from storage
-    const dataDir = this.getDataDir();
-    const usagePath = path.join(dataDir, `usage-${key}.json`);
-    
     try {
-      if (fs.existsSync(usagePath)) {
-        const data = JSON.parse(fs.readFileSync(usagePath, 'utf-8'));
-        this.usageCache.set(key, data);
-        return data;
+      const [result] = await db.select().from(quotaTable).where(eq(quotaTable.userId, key));
+      if (result) {
+        return result as unknown as UsageStats;
       }
     } catch (error) {
       console.warn(`Error loading usage for ${key}:`, error);
@@ -241,21 +227,22 @@ export class QuotaManager {
   }
   
   private async saveUsage(key: string, usage: UsageStats): Promise<void> {
-    const dataDir = this.getDataDir();
-    
-    // Ensure directory exists
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+    try {
+      await db.insert(quotaTable).values({
+        userId: key,
+        ...usage
+      }).onConflictDoUpdate({
+        target: quotaTable.userId,
+        set: usage
+      });
+    } catch (error) {
+      console.error(`Error saving usage for ${key}:`, error);
     }
-    
-    const usagePath = path.join(dataDir, `usage-${key}.json`);
-    fs.writeFileSync(usagePath, JSON.stringify(usage, null, 2));
-    this.usageCache.set(key, usage);
   }
   
-  // Clear cache (useful for testing)
+  // Cache is no longer used, so clearCache is a no-op
   clearCache(): void {
-    this.usageCache.clear();
+    // No-op
   }
 }
 

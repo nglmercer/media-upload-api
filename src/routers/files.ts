@@ -1,21 +1,17 @@
-import { Hono } from "hono";
 import path from "path";
-import fs from "fs";
 import { mkdir, unlink, readFile } from "fs/promises";
 import { fileStore } from "../store/fileStore";
 import { fileValidator } from "../services/file-validator";
 import { quotaManager } from "../services/quota-manager";
-import { config } from "../config";
+import { config, Permission } from "../config";
 import { getAuth } from "../middleware/auth";
-import { Permission } from "../config";
+import { json, matchPath, type ServerContext } from "../utils/vanilla-http";
 import {
   FileStatus,
   FileCategory,
   getExtensionFromMime,
   type FileItem,
 } from "../types/file";
-
-const filesRouter = new Hono();
 
 // Helper: format file size
 function formatFileSize(bytes: number): string {
@@ -39,7 +35,6 @@ function getDirectoryForCategory(category: string): string {
     model: 'models',
     data: 'data',
     other: 'other',
-    // Security categories
     unknown: 'unknown',
     mismatch: 'mismatch',
     corrupted: 'corrupted',
@@ -49,47 +44,33 @@ function getDirectoryForCategory(category: string): string {
   return dirMap[category] || 'other';
 }
 
-// POST /api/files - Upload a file
-filesRouter.post('/', async (c) => {
-  const auth = getAuth(c);
-  
-  // Check permission
-  if (!auth.permissions.includes(Permission.UPLOAD)) {
-    return c.json({ error: 'Upload permission required' }, 403);
-  }
+/**
+ * POST /api/files - Upload a file
+ */
+async function uploadFile(req: Request, ctx: ServerContext) {
+  const auth = getAuth(ctx);
+  if (!auth.permissions.includes(Permission.UPLOAD)) return json({ error: 'Upload permission required' }, 403);
 
   let formData: FormData;
   try {
-    formData = await c.req.formData();
+    formData = await req.formData();
   } catch {
-    return c.json({ error: 'Invalid form data' }, 400);
+    return json({ error: 'Invalid form data' }, 400);
   }
 
   const file = formData.get('file');
-  if (!(file instanceof File)) {
-    return c.json({ error: 'Missing file field' }, 400);
-  }
+  if (!(file instanceof File)) return json({ error: 'Missing file field' }, 400);
 
-  // Validate file
   const validation = await fileValidator.validate(file);
-  
-  // Check quota
   const quotaCheck = await quotaManager.checkQuota(auth.userId, file.size);
-  if (!quotaCheck.allowed) {
-    return c.json({ error: quotaCheck.reason }, 403);
-  }
+  if (!quotaCheck.allowed) return json({ error: quotaCheck.reason }, 403);
 
-  // Determine status based on validation
   let status: string = FileStatus.VALID;
   if (validation.flags.length > 0) {
-    if (validation.category === 'corrupted' || validation.category === 'disguised') {
-      status = FileStatus.QUARANTINE;
-    } else {
-      status = FileStatus.SUSPICIOUS;
-    }
+    status = (validation.category === 'corrupted' || validation.category === 'disguised') 
+      ? FileStatus.QUARANTINE : FileStatus.SUSPICIOUS;
   }
 
-  // Generate ID and paths
   const id = crypto.randomUUID();
   const ext = validation.detectedExtension || getExtensionFromMime(validation.detectedMime || '') || '';
   const fileCategory = validation.category;
@@ -103,16 +84,12 @@ filesRouter.post('/', async (c) => {
   const fileName = `${id}${ext}`;
   const filePath = path.join(baseDir, fileName);
 
-  // Ensure directory exists
   await mkdir(baseDir, { recursive: true });
-
-  // Write file
   await Bun.write(filePath, file);
 
-  // Determine URL
   const url = `/uploads/${getDirectoryForCategory(fileCategory)}/${fileName}`;
+  const isPublic = formData.get('isPublic') !== 'false'; // Default to true
 
-  // Create file record
   const fileRecord: FileItem = {
     id,
     name: fileName,
@@ -125,10 +102,9 @@ filesRouter.post('/', async (c) => {
     status: status as FileItem['status'],
     flags: validation.flags,
     url,
+    isPublic,
     storagePath: filePath,
-    integrity: {
-      sha256: validation.integrity.sha256,
-    },
+    integrity: { sha256: validation.integrity.sha256 },
     metadata: {},
     tags: [],
     uploadedBy: auth.userId,
@@ -137,137 +113,62 @@ filesRouter.post('/', async (c) => {
     deletedAt: null,
   };
 
-  // Parse metadata if provided
   const metadataRaw = formData.get('metadata');
   if (typeof metadataRaw === 'string') {
-    try {
-      fileRecord.metadata = JSON.parse(metadataRaw);
-    } catch {
-      // Ignore invalid JSON
-    }
+    try { fileRecord.metadata = JSON.parse(metadataRaw); } catch {}
   }
 
-  // Save to store
   await fileStore.save(id, fileRecord);
-
-  // Reserve quota
   await quotaManager.reserveQuota(auth.userId, file.size, fileCategory as FileCategory);
 
-  return c.json(fileRecord, 201);
-});
+  return json(fileRecord, 201);
+}
 
-// GET /api/files - List files
-filesRouter.get('/', async (c) => {
-  const auth = getAuth(c);
-  
-  if (!auth.permissions.includes(Permission.LIST)) {
-    return c.json({ error: 'List permission required' }, 403);
-  }
+/**
+ * GET /api/files - List files
+ */
+async function listFiles(req: Request, ctx: ServerContext) {
+  const auth = getAuth(ctx);
+  // Removed strict LIST check to allow access to public files even without the permission
 
-  const category = c.req.query('category');
-  const status = c.req.query('status');
-  const page = parseInt(c.req.query('page') || '1');
-  const pageSize = parseInt(c.req.query('pageSize') || '50');
+  const category = ctx.url.searchParams.get('category');
+  const status = ctx.url.searchParams.get('status');
+  const page = parseInt(ctx.url.searchParams.get('page') || '1');
+  const pageSize = parseInt(ctx.url.searchParams.get('pageSize') || '50');
 
   let files = Object.values(await fileStore.getAll());
-
-  // Filter by category
-  if (category) {
-    files = files.filter(f => f.category === category);
+  
+  // Apply permission filtering: if not authorized to list all, only show public ones
+  if (!auth.permissions.includes(Permission.LIST)) {
+    files = files.filter(f => f.isPublic);
   }
 
-  // Filter by status
-  if (status) {
-    files = files.filter(f => f.status === status);
-  }
-
-  // Exclude deleted files by default
+  if (category) files = files.filter(f => f.category === category);
+  if (status) files = files.filter(f => f.status === status);
   files = files.filter(f => f.status !== FileStatus.DELETED);
-
-  // Sort by upload date (newest first)
   files.sort((a, b) => b.uploadedAt - a.uploadedAt);
 
-  // Paginate
   const total = files.length;
-  const totalPages = Math.ceil(total / pageSize);
   const start = (page - 1) * pageSize;
   const pagedFiles = files.slice(start, start + pageSize);
 
-  return c.json({
+  return json({
     files: pagedFiles,
-    pagination: {
-      page,
-      pageSize,
-      total,
-      totalPages,
-    },
-    filters: {
-      category,
-      status,
-    },
+    pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    filters: { category, status },
   });
-});
+}
 
-// GET /api/files/categories - List available categories
-filesRouter.get('/categories', async (c) => {
-  return c.json({
-    categories: Object.values(FileCategory),
-    securityCategories: ['unknown', 'mismatch', 'corrupted', 'disguised'],
-  });
-});
+/**
+ * GET /api/files/:id/download - Download file
+ */
+async function downloadFile(req: Request, ctx: ServerContext) {
+  const auth = getAuth(ctx);
+  const file = await fileStore.get(ctx.params.id);
+  if (!file || file.status === FileStatus.DELETED) return json({ error: 'File not found' }, 404);
 
-// GET /api/files/suspicious - List suspicious files
-filesRouter.get('/suspicious', async (c) => {
-  const auth = getAuth(c);
-  
-  if (!auth.permissions.includes(Permission.LIST)) {
-    return c.json({ error: 'List permission required' }, 403);
-  }
-
-  const files = await fileStore.findByStatus(FileStatus.SUSPICIOUS);
-  const quarantine = await fileStore.findByStatus(FileStatus.QUARANTINE);
-
-  return c.json({
-    suspicious: files,
-    quarantine,
-  });
-});
-
-// GET /api/files/:id - Get file metadata
-filesRouter.get('/:id', async (c) => {
-  const auth = getAuth(c);
-  const id = c.req.param('id');
-
-  if (!auth.permissions.includes(Permission.READ)) {
-    return c.json({ error: 'Read permission required' }, 403);
-  }
-
-  const file = await fileStore.get(id);
-  if (!file) {
-    return c.json({ error: 'File not found' }, 404);
-  }
-
-  return c.json(file);
-});
-
-// GET /api/files/:id/download - Download file
-filesRouter.get('/:id/download', async (c) => {
-  const auth = getAuth(c);
-  const id = c.req.param('id');
-
-  if (!auth.permissions.includes(Permission.READ)) {
-    return c.json({ error: 'Read permission required' }, 403);
-  }
-
-  const file = await fileStore.get(id);
-  if (!file) {
-    return c.json({ error: 'File not found' }, 404);
-  }
-
-  // Check if file is accessible
-  if (file.status === FileStatus.DELETED) {
-    return c.json({ error: 'File has been deleted' }, 404);
-  }
+  const canRead = file.isPublic || auth.permissions.includes(Permission.READ);
+  if (!canRead) return json({ error: 'Read permission required' }, 403);
 
   try {
     const data = await readFile(file.storagePath);
@@ -277,72 +178,92 @@ filesRouter.get('/:id/download', async (c) => {
         'Content-Disposition': `attachment; filename="${file.originalName}"`,
       },
     });
-  } catch {
-    return c.json({ error: 'File not accessible' }, 500);
-  }
-});
+  } catch { return json({ error: 'File not accessible' }, 500); }
+}
 
-// DELETE /api/files/:id - Delete file
-filesRouter.delete('/:id', async (c) => {
-  const auth = getAuth(c);
-  const id = c.req.param('id');
+/**
+ * Main Files Router
+ */
+export async function filesRouter(req: Request, ctx: ServerContext): Promise<Response | null> {
+  const { pathname } = ctx.url;
+  const { method } = req;
 
-  if (!auth.permissions.includes(Permission.DELETE)) {
-    return c.json({ error: 'Delete permission required' }, 403);
-  }
-
-  const file = await fileStore.get(id);
-  if (!file) {
-    return c.json({ error: 'File not found' }, 404);
+  if (pathname === '/api/files') {
+    if (method === 'POST') return uploadFile(req, ctx);
+    if (method === 'GET') return listFiles(req, ctx);
   }
 
-  // Soft delete
-  file.status = FileStatus.DELETED;
-  file.deletedAt = Date.now();
-  await fileStore.save(id, file);
-
-  // Release quota
-  await quotaManager.releaseQuota(auth.userId, file.size, file.category as FileCategory);
-
-  // Optionally delete the actual file
-  try {
-    await unlink(file.storagePath);
-  } catch {
-    // File might already be deleted
+  if (pathname === '/api/files/categories' && method === 'GET') {
+    return json({ categories: Object.values(FileCategory), securityCategories: ['unknown', 'mismatch', 'corrupted', 'disguised'] });
   }
 
-  return c.json({ message: 'File deleted successfully' });
-});
-
-// PUT /api/files/:id/status - Update file status
-filesRouter.put('/:id/status', async (c) => {
-  const auth = getAuth(c);
-  const id = c.req.param('id');
-
-  if (!auth.permissions.includes(Permission.ADMIN)) {
-    return c.json({ error: 'Admin permission required' }, 403);
+  if (pathname === '/api/files/suspicious' && method === 'GET') {
+    const auth = getAuth(ctx);
+    if (!auth.permissions.includes(Permission.LIST)) return json({ error: 'List permission required' }, 403);
+    const suspicious = await fileStore.findByStatus(FileStatus.SUSPICIOUS);
+    const quarantine = await fileStore.findByStatus(FileStatus.QUARANTINE);
+    return json({ suspicious, quarantine });
   }
 
-  let body;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
+  let params = matchPath('/api/files/:id', pathname);
+  if (params) {
+    ctx.params = { ...ctx.params, ...params };
+    if (method === 'GET') {
+      const auth = getAuth(ctx);
+      const file = await fileStore.get(params.id);
+      
+      if (!file || file.status === FileStatus.DELETED) {
+        return json({ error: 'File not found' }, 404);
+      }
+
+      const canRead = file.isPublic || auth.permissions.includes(Permission.READ);
+      if (!canRead) return json({ error: 'Read permission required' }, 403);
+
+      return json(file);
+    }
+    if (method === 'DELETE') {
+      const auth = getAuth(ctx);
+      if (!auth.permissions.includes(Permission.DELETE)) {
+        return json({ error: 'Delete permission required' }, 403);
+      }
+
+      const file = await fileStore.get(params.id);
+      if (!file || file.status === FileStatus.DELETED) {
+        return json({ error: 'File not found' }, 404);
+      }
+
+      // Check ownership: only the owner (uploader) or an admin can delete
+      const isOwner = auth.userId && file.uploadedBy === auth.userId;
+      const isAdmin = auth.permissions.includes(Permission.ADMIN);
+
+      if (!isOwner && !isAdmin) {
+        return json({ error: 'Only the file owner or an administrator can delete this file' }, 403);
+      }
+
+      file.status = FileStatus.DELETED;
+      file.deletedAt = Date.now();
+      await fileStore.save(params.id, file);
+
+      // Release quota for the original uploader
+      if (file.uploadedBy) {
+        await quotaManager.releaseQuota(file.uploadedBy, file.size, file.category as FileCategory);
+      }
+
+      try {
+        await unlink(file.storagePath);
+      } catch (err) {
+        console.error(`Failed to delete file from storage: ${file.storagePath}`, err);
+      }
+
+      return json({ message: 'File deleted successfully' });
+    }
   }
 
-  const file = await fileStore.get(id);
-  if (!file) {
-    return c.json({ error: 'File not found' }, 404);
+  params = matchPath('/api/files/:id/download', pathname);
+  if (params && method === 'GET') {
+    ctx.params = { ...ctx.params, ...params };
+    return downloadFile(req, ctx);
   }
 
-  if (body.status) {
-    file.status = body.status;
-  }
-
-  file.updatedAt = Date.now();
-  await fileStore.save(id, file);
-
-  return c.json(file);
-});
-
-export { filesRouter };
+  return null;
+}

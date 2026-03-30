@@ -90,6 +90,32 @@ export interface TokenInfo {
   permissions: string[];
 }
 
+export interface LoginResult {
+  success: boolean;
+  message: string;
+  sessionId?: string;
+  user?: {
+    id: number;
+    email: string;
+    username: string;
+  };
+}
+
+export interface RegisterResult {
+  success: boolean;
+  message: string;
+  user?: {
+    id: number;
+    email: string;
+    username: string;
+  };
+}
+
+export interface LogoutResult {
+  success: boolean;
+  message: string;
+}
+
 export interface FileItem {
   id: string;
   name: string;

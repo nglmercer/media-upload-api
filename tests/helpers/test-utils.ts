@@ -1,13 +1,11 @@
-import { Hono } from 'hono'
-import { filesRouter } from '../../src/routers/files'
-
+import { handleRequest } from '../../src/app'
 import { config } from '../../src/config'
 import path from 'path'
 import { mkdir, rm, writeFile } from 'fs/promises'
 import { JsonManager } from 'json-obj-manager'
 import { FileAdapter } from 'json-obj-manager/node'
 
-export async function createTestApp(): Promise<{ app: Hono; testStorage: any; originalStorage: any }> {
+export async function createTestApp(): Promise<{ handleRequest: typeof handleRequest; testStorage: any; originalStorage: any }> {
   // Create a fresh file storage instance for each test
   const testMediaPath = path.join(process.cwd(), 'data', 'test-files.json')
   const testAdapter = new FileAdapter<any>(testMediaPath)
@@ -15,17 +13,8 @@ export async function createTestApp(): Promise<{ app: Hono; testStorage: any; or
     adapter: testAdapter
   })
 
-  // Note: We can't easily override the internal storage in the new structure
-  // Tests would need to use the app directly
-
-  const app = new Hono()
-  app.route('/api/files', filesRouter)
-  app.get('/api/files/data', async (c) => {
-    const data = await testStorage.getAll()
-    return c.json(data)
-  })
-
-  return { app, testStorage, originalStorage: null }
+  // We export handleRequest which is our main entry point now
+  return { handleRequest, testStorage, originalStorage: null }
 }
 
 export async function setupTestEnvironment(): Promise<void> {
@@ -78,6 +67,9 @@ export async function setupTestEnvironment(): Promise<void> {
   for (const dir of testDirs) {
     await mkdir(path.join(process.cwd(), dir), { recursive: true })
   }
+  
+  // Reload config to ensure it's picked up
+  config.reload()
 }
 
 export async function cleanupTestEnvironment(): Promise<void> {
@@ -96,6 +88,8 @@ export async function cleanupTestEnvironment(): Promise<void> {
   } catch {
     // Ignore if file doesn't exist
   }
+  
+  config.reload()
 }
 
 export function createMockFile(type: string, name?: string): File {

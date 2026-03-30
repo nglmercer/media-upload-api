@@ -4,7 +4,7 @@ export const mediaLibraryStyles = css`
   :host {
     position: fixed;
     inset: 0;
-    background-color: rgba(0, 0, 0, 0.85);
+    background-color: rgba(0, 0, 0, 0.5);
     z-index: 50;
     display: flex;
     align-items: center;
@@ -28,6 +28,9 @@ export const mediaLibraryStyles = css`
     box-shadow: 0 32px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
     overflow: hidden;
   }
+  .modal.with-details {
+    max-width: 72rem;
+  }
 
   /* ── Header ──────────────────────────────────────── */
   .header {
@@ -39,6 +42,11 @@ export const mediaLibraryStyles = css`
     background: rgba(255,255,255,0.02);
     flex-shrink: 0;
   }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
   .header h2 {
     font-size: 1.25rem;
     font-weight: 700;
@@ -48,6 +56,32 @@ export const mediaLibraryStyles = css`
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+  .header-count {
+    font-size: 0.75rem;
+    color: #6b7280;
+    background: rgba(255,255,255,0.06);
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .view-toggle-btn {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #6b7280;
+    cursor: pointer;
+    border-radius: 0.375rem;
+    padding: 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .view-toggle-btn:hover { background: rgba(255,255,255,0.12); color: white; }
+  .view-toggle-btn.active { background: rgba(145,70,255,0.2); color: #c084fc; border-color: rgba(145,70,255,0.3); }
   .header-close {
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.08);
@@ -103,6 +137,12 @@ export const mediaLibraryStyles = css`
   .search-input::placeholder { color: #6b7280; }
   .search-input:focus { border-color: #a970ff; background: rgba(169,112,255,0.06); }
 
+  .filter-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
   .sort-container {
     display: flex;
     align-items: center;
@@ -110,11 +150,11 @@ export const mediaLibraryStyles = css`
   }
   .sort-container label { font-size: 0.8rem; font-weight: 600; color: #9ca3af; white-space: nowrap; }
   .sort-select {
-    background: rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.9);
+    color: black;
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 0.5rem;
     padding: 0.5rem 0.625rem;
-    color: white;
     font-size: 0.8rem;
     outline: none;
     cursor: pointer;
@@ -183,7 +223,26 @@ export const mediaLibraryStyles = css`
   .content::-webkit-scrollbar { width: 6px; }
   .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
 
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .content-split {
+    display: flex;
+    gap: 1.5rem;
+    overflow: hidden;
+  }
+  .content-main {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.12) transparent;
+  }
+  .content-main::-webkit-scrollbar { width: 6px; }
+  .content-main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    position: relative;
+  }
   @media (max-width: 600px) { .grid { grid-template-columns: repeat(2, 1fr); } }
 
   /* ── Footer ──────────────────────────────────────── */

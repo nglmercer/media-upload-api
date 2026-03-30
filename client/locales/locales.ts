@@ -3,6 +3,7 @@ import { configureLocalization } from '@lit/localize';
 import esTranslations from './es.json';
 import enTranslations from './en.json';
 import { WidgetEvents, WidgetEventTypes } from '../events';
+
 // Do not modify this file by hand!
 // Re-generate this file by running lit-localize.
 
@@ -28,19 +29,17 @@ export const allLocales = [
 ] as const;
 
 // Import JSON fallbacks for the custom .t() adapter
-
-
-const translations: Record<string, Record<string, string>> = {
-  es: esTranslations as Record<string, string>,
-  en: enTranslations as Record<string, string>,
+const translations: Record<string, any> = {
+  es: esTranslations,
+  en: enTranslations,
 };
 
 // Configure Lit Localize Runtime Mode
 export const { getLocale: _getLitLocale, setLocale: setLitLocale } = configureLocalization({
   sourceLocale,
   targetLocales,
-  // Using .ts extension for Vite Dev Server 
-  loadLocale: (locale) => import(`../generated/locales/${locale}.ts`),
+  // Use static imports instead of dynamic ones to avoid MIME/Server errors
+  loadLocale: (locale: string) => Promise.resolve(translations[locale]),
 });
 
 // Get locale - checks localStorage first, defaults to 'es'

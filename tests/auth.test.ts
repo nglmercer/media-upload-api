@@ -1,13 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { Hono } from 'hono'
 import { authMiddleware, requirePermission, getAuth, type AuthContext } from '../src/middleware/auth'
 import { config } from '../src/config'
+import type { ServerContext } from '../src/utils/vanilla-http'
 
 describe('Auth Middleware', () => {
-  let app: Hono
-
   beforeEach(() => {
-    app = new Hono()
     config.reload()
   })
 
@@ -21,22 +18,22 @@ describe('Auth Middleware', () => {
       const oauthConfig = config.getOAuth()
       config.update({ oauth: { ...oauthConfig, enabled: false } })
 
-      app.use('*', authMiddleware)
-      app.get('/test', (c) => {
-        const auth = getAuth(c)
-        return c.json(auth)
-      })
+      const req = new Request('http://localhost/test')
+      const ctx: ServerContext = {
+        params: {},
+        url: new URL(req.url)
+      }
 
-      const res = await app.request('/test')
-      const body = await res.json() as AuthContext
+      const res = await authMiddleware(req, ctx)
+      expect(res).toBeNull() // No error response, proceed
 
-      expect(res.status).toBe(200)
-      expect(body.permissions).toContain('upload')
-      expect(body.permissions).toContain('read')
-      expect(body.permissions).toContain('delete')
-      expect(body.permissions).toContain('list')
-      expect(body.permissions).toContain('admin')
-      expect(body.authenticated).toBe(false)
+      const auth = getAuth(ctx)
+      expect(auth.permissions).toContain('upload')
+      expect(auth.permissions).toContain('read')
+      expect(auth.permissions).toContain('delete')
+      expect(auth.permissions).toContain('list')
+      expect(auth.permissions).toContain('admin')
+      expect(auth.authenticated).toBe(false)
     })
 
     it('should allow all permissions when token auth is disabled', async () => {
@@ -50,18 +47,18 @@ describe('Auth Middleware', () => {
         } 
       })
 
-      app.use('*', authMiddleware)
-      app.get('/test', (c) => {
-        const auth = getAuth(c)
-        return c.json(auth)
-      })
+      const req = new Request('http://localhost/test')
+      const ctx: ServerContext = {
+        params: {},
+        url: new URL(req.url)
+      }
 
-      const res = await app.request('/test')
-      const body = await res.json() as AuthContext
+      const res = await authMiddleware(req, ctx)
+      expect(res).toBeNull()
 
-      expect(res.status).toBe(200)
-      expect(body.permissions).toContain('upload')
-      expect(body.authenticated).toBe(false)
+      const auth = getAuth(ctx)
+      expect(auth.permissions).toContain('upload')
+      expect(auth.authenticated).toBe(false)
     })
 
     it('should reject request without token when token auth is enabled', async () => {
@@ -75,15 +72,17 @@ describe('Auth Middleware', () => {
         } 
       })
 
-      app.use('*', authMiddleware)
-      app.get('/test', (c) => {
-        return c.json({ ok: true })
-      })
+      const req = new Request('http://localhost/test')
+      const ctx: ServerContext = {
+        params: {},
+        url: new URL(req.url)
+      }
 
-      const res = await app.request('/test')
-
-      expect(res.status).toBe(401)
-      const body = await res.json()
+      const res = await authMiddleware(req, ctx)
+      expect(res).toBeInstanceOf(Response)
+      expect(res?.status).toBe(401)
+      
+      const body = await res?.json()
       expect(body).toHaveProperty('error')
     })
 
@@ -98,56 +97,57 @@ describe('Auth Middleware', () => {
         } 
       })
 
-      app.use('*', authMiddleware)
-      app.get('/test', (c) => {
-        return c.json({ ok: true })
-      })
-
-      const res = await app.request('/test', {
+      const req = new Request('http://localhost/test', {
         headers: { 'X-Auth-Token': 'invalid-token' }
       })
+      const ctx: ServerContext = {
+        params: {},
+        url: new URL(req.url)
+      }
 
-      expect(res.status).toBe(401)
+      const res = await authMiddleware(req, ctx)
+      expect(res).toBeInstanceOf(Response)
+      expect(res?.status).toBe(401)
     })
   })
 
   describe('requirePermission', () => {
     it('should allow request when user has required permission', async () => {
-      const oauthConfig = config.getOAuth()
-      config.update({ oauth: { ...oauthConfig, enabled: false } })
+      const auth: AuthContext = {
+        authenticated: true,
+        userId: 'test',
+        permissions: ['read'],
+        tokenLabel: 'test'
+      }
+      const ctx: ServerContext = { params: {}, url: new URL('http://localhost'), auth }
+      const req = new Request('http://localhost')
 
-      app.use('*', authMiddleware)
-      app.get('/test', requirePermission('read'), (c) => {
-        return c.json({ ok: true })
-      })
-
-      const res = await app.request('/test')
-      expect(res.status).toBe(200)
+      const middleware = requirePermission('read')
+      const res = await middleware(req, ctx)
+      expect(res).toBeNull()
     })
 
     it('should reject request when user lacks required permission', async () => {
-      const oauthConfig = config.getOAuth()
-      config.update({ oauth: { ...oauthConfig, enabled: false } })
+      const auth: AuthContext = {
+        authenticated: true,
+        userId: 'test',
+        permissions: ['read'],
+        tokenLabel: 'test'
+      }
+      const ctx: ServerContext = { params: {}, url: new URL('http://localhost'), auth }
+      const req = new Request('http://localhost')
 
-      // Remove read permission from default
-      app.use('*', authMiddleware)
-      app.get('/test', requirePermission('admin'), (c) => {
-        return c.json({ ok: true })
-      })
-
-      const res = await app.request('/test')
-      // Default permissions include admin, so this should pass
-      expect(res.status).toBe(200)
+      const middleware = requirePermission('admin')
+      const res = await middleware(req, ctx)
+      expect(res).toBeInstanceOf(Response)
+      expect(res?.status).toBe(403)
     })
   })
 
   describe('getAuth', () => {
     it('should return default auth context when not set', () => {
-      // Create a mock context
-      const mockContext = {
-        get: () => undefined
-      } as any
-      const auth = getAuth(mockContext)
+      const ctx: ServerContext = { params: {}, url: new URL('http://localhost') }
+      const auth = getAuth(ctx)
       expect(auth.authenticated).toBe(false)
       expect(auth.userId).toBeNull()
       expect(auth.permissions).toEqual([])

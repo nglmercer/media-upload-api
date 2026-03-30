@@ -1,7 +1,7 @@
 import { html, css, LitElement,unsafeCSS } from 'lit';
 import { Component, property, state, query } from './litcomponents';
 import { LocalizeController } from '../locales/locales';
-import styles from './Dialog.css?inline';
+import {dialogStyles} from './styles';
 import { WidgetEvents, WidgetEventTypes } from '../events';
 export type DialogTheme = 'light' | 'dark' | 'system';
 export type DialogType = 'alert' | 'confirm' | 'prompt' | 'modal';
@@ -55,7 +55,7 @@ export class AppDialog extends LitElement {
   @state() private _theme: 'light' | 'dark' = 'dark';
 
   // Localization controller
-  localizer = new LocalizeController(this);
+  localizer: LocalizeController = new LocalizeController(this);
 
   @query('#dialog-input') private _inputElement!: HTMLInputElement;
   @query('#dialog-overlay') private _overlayElement!: HTMLDivElement;
@@ -66,7 +66,7 @@ export class AppDialog extends LitElement {
   :host {
     display: contents;
   }
-  ${unsafeCSS(styles)}
+  ${unsafeCSS(dialogStyles)}
   `;
 
   connectedCallback() {

@@ -1,13 +1,13 @@
-import { upgradeWebSocket, websocket } from 'hono/bun'
 import { ServerWebSocket } from 'bun'
 import { io, type WebSocketData } from './websocket-adapter'
 import { loadConfig, saveConfig } from './config'
-import { createApp } from './app'
+import { handleRequest } from './app'
 
-// Import Discovery (optional, enabled by default via env var)
-import { createDiscoveryShutdownHandler, type Discovery as DiscoveryType } from './discover'
+// Import Discovery (optional)
+import { type Discovery as DiscoveryType } from './discover'
 import { initDiscovery } from './discover/init'
-
+import loginHtml from '../public/index.html'
+import componentHtml from '../client/index.html'
 /**
  * Start the HTTP/WebSocket server
  * @param options - Server options
@@ -17,9 +17,6 @@ export function startServer(options?: { port?: number }): ReturnType<typeof Bun.
   const serverConfig = loadConfig()
   const port = options?.port ?? serverConfig.port
 
-  // Mount WebSocket handler to app
-  const app = createApp()
-  
   // WebSocket handling
   io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`)
@@ -28,65 +25,66 @@ export function startServer(options?: { port?: number }): ReturnType<typeof Bun.
     })
   })
 
-  app.get(
-    '/ws',
-    upgradeWebSocket((c) => {
-      return {
-        onOpen: (event, ws) => {
-          io.handleOpen(ws.raw as ServerWebSocket<WebSocketData>)
-        },
-        onMessage: (event, ws) => {
-          io.handleMessage(ws.raw as ServerWebSocket<WebSocketData>, event.data.toString())
-        },
-        onClose: (event, ws) => {
-          io.handleClose(ws.raw as ServerWebSocket<WebSocketData>, event.code, event.reason)
-        },
-        onError: (event, ws) => {
-          console.error('WebSocket error:', event)
-        },
-      }
-    })
-  )
-
   let discoveryInstance: DiscoveryType | null = null
+
+  // Helper function for Bun.serve config
+  const createServeOptions = (p: number) => ({
+    port: p,
+    fetch(req: Request, server: ReturnType<typeof Bun.serve>) {
+      const url = new URL(req.url);
+
+      // Handle WebSocket upgrade
+      if (url.pathname === '/ws') {
+        if (server.upgrade(req, {
+          data: {
+            id: '', // Will be set in handleOpen
+            socket: null // Will be set in handleOpen
+          }
+        })) {
+          return; // Successful upgrade
+        }
+        return new Response('WebSocket upgrade failed', { status: 400 });
+      }
+
+      // Handle HTTP requests
+      return handleRequest(req);
+    },
+    websocket: {
+      open(ws: ServerWebSocket<WebSocketData>) {
+        io.handleOpen(ws);
+      },
+      message(ws: ServerWebSocket<WebSocketData>, message: string | Buffer) {
+        io.handleMessage(ws, message.toString());
+      },
+      close(ws: ServerWebSocket<WebSocketData>, code: number, reason: string) {
+        io.handleClose(ws, code, reason);
+      },
+      drain(ws: ServerWebSocket<WebSocketData>) {
+        // Handle backpressure if needed
+      }
+    },
+    routes: {
+      "/": loginHtml,
+      "/components": componentHtml,
+    }
+  });
 
   // Start server
   let server: ReturnType<typeof Bun.serve>
   
   try {
-    server = Bun.serve({
-      fetch: app.fetch,
-      port,
-      websocket,
-    })
-    
-    // Check if port was actually used (Bun might use random port if specified port is unavailable)
+    server = Bun.serve(createServeOptions(port))
     const actualPort = server.port as number
-    
     console.log(`Server running on port ${actualPort}`)
     saveConfig({ port: actualPort })
-    
-    // Initialize Discovery service after server starts
-    initDiscovery(actualPort).then(instance => {
-      discoveryInstance = instance
-    })
-    
+    initDiscovery(actualPort).then(instance => { discoveryInstance = instance })
   } catch (error) {
     // Fallback: start on random available port
-    server = Bun.serve({
-      fetch: app.fetch,
-      port: 0, // Let the OS choose an available port
-      websocket,
-    })
-    
+    server = Bun.serve(createServeOptions(0))
     const actualPort = server.port as number
     saveConfig({ port: actualPort })
     console.log(`Server running on random port ${actualPort}`)
-    
-    // Initialize Discovery service after server starts
-    initDiscovery(actualPort).then(instance => {
-      discoveryInstance = instance
-    })
+    initDiscovery(actualPort).then(instance => { discoveryInstance = instance })
   }
 
   // Handle graceful shutdown
@@ -103,9 +101,6 @@ export function startServer(options?: { port?: number }): ReturnType<typeof Bun.
 
   return server
 }
-
-// Export app creation for testing/custom server setups
-export { createApp }
 
 // Auto-start when run directly with Bun
 // @ts-ignore - Bun supports import.meta.main
