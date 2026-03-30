@@ -222,16 +222,40 @@ export async function filesRouter(req: Request, ctx: ServerContext): Promise<Res
       return json(file);
     }
     if (method === 'DELETE') {
-       const auth = getAuth(ctx);
-       if (!auth.permissions.includes(Permission.DELETE)) return json({ error: 'Delete permission required' }, 403);
-       const file = await fileStore.get(params.id);
-       if (!file) return json({ error: 'File not found' }, 404);
-       file.status = FileStatus.DELETED;
-       file.deletedAt = Date.now();
-       await fileStore.save(params.id, file);
-       await quotaManager.releaseQuota(auth.userId, file.size, file.category as FileCategory);
-       try { await unlink(file.storagePath); } catch {}
-       return json({ message: 'File deleted successfully' });
+      const auth = getAuth(ctx);
+      if (!auth.permissions.includes(Permission.DELETE)) {
+        return json({ error: 'Delete permission required' }, 403);
+      }
+
+      const file = await fileStore.get(params.id);
+      if (!file || file.status === FileStatus.DELETED) {
+        return json({ error: 'File not found' }, 404);
+      }
+
+      // Check ownership: only the owner (uploader) or an admin can delete
+      const isOwner = auth.userId && file.uploadedBy === auth.userId;
+      const isAdmin = auth.permissions.includes(Permission.ADMIN);
+
+      if (!isOwner && !isAdmin) {
+        return json({ error: 'Only the file owner or an administrator can delete this file' }, 403);
+      }
+
+      file.status = FileStatus.DELETED;
+      file.deletedAt = Date.now();
+      await fileStore.save(params.id, file);
+
+      // Release quota for the original uploader
+      if (file.uploadedBy) {
+        await quotaManager.releaseQuota(file.uploadedBy, file.size, file.category as FileCategory);
+      }
+
+      try {
+        await unlink(file.storagePath);
+      } catch (err) {
+        console.error(`Failed to delete file from storage: ${file.storagePath}`, err);
+      }
+
+      return json({ message: 'File deleted successfully' });
     }
   }
 
