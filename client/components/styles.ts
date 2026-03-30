@@ -1,3 +1,6 @@
+import { css } from "lit";
+
+export const dialogStyles = css`
 .dialog-overlay {
   position: fixed;
   inset: 0;
@@ -368,3 +371,4 @@
     width: 100%;
   }
 }
+`;
