@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { LocalizeController, setLocale } from '../../client/locales/locales';
 import './AuthLogin';
 import './AuthRegister';
 import './ProfileStats';
@@ -8,6 +9,7 @@ import './ProfileStats';
 export class AuthDashboard extends LitElement {
     @state() private authenticated = !!localStorage.getItem('session_id');
     @state() private activeTab: 'login' | 'signup' = 'login';
+    private i18n: LocalizeController = new LocalizeController(this);
 
     static styles = css`
         :host { 
@@ -24,6 +26,8 @@ export class AuthDashboard extends LitElement {
             overflow: hidden;
             transition: all 0.3s ease;
             animation: slideUp 0.5s ease-out;
+            display: flex;
+            flex-direction: column;
         }
         .tabs {
             display: flex;
@@ -47,7 +51,28 @@ export class AuthDashboard extends LitElement {
         }
         .content {
             padding: 24px;
-            min-height: 380px;
+            min-height: 400px; /* FIXED HEIGHT to prevent jumps */
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .lang-switcher {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            font-size: 0.8em;
+            color: var(--text-muted);
+        }
+        .lang-btn {
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+        .lang-btn.active {
+            opacity: 1;
+            font-weight: bold;
+            color: var(--primary);
         }
 
         @keyframes slideUp {
@@ -76,15 +101,23 @@ export class AuthDashboard extends LitElement {
             <div class="card">
                 <div class="tabs">
                     <div class="tab ${this.activeTab === 'login' ? 'active' : ''}" 
-                         @click=${() => this.activeTab = 'login'}>Login</div>
+                         @click=${() => this.activeTab = 'login'}>${this.i18n.t('auth.login')}</div>
                     <div class="tab ${this.activeTab === 'signup' ? 'active' : ''}" 
-                         @click=${() => this.activeTab = 'signup'}>Signup</div>
+                         @click=${() => this.activeTab = 'signup'}>${this.i18n.t('auth.signup')}</div>
                 </div>
                 <div class="content">
                     ${this.activeTab === 'login' 
-                        ? html`<auth-login @switch-tab=${(e: CustomEvent) => this.activeTab = e.detail}></auth-login>` 
-                        : html`<auth-register @switch-tab=${(e: CustomEvent) => this.activeTab = e.detail}></auth-register>`}
+                        ? html`<auth-login @switch-tab=${(e: any) => this.activeTab = e.detail}></auth-login>` 
+                        : html`<auth-register @switch-tab=${(e: any) => this.activeTab = e.detail}></auth-register>`}
                 </div>
+            </div>
+
+            <div class="lang-switcher">
+                <span class="lang-btn ${this.i18n.locale === 'es' ? 'active' : ''}" 
+                      @click=${() => setLocale('es')}>ES</span>
+                |
+                <span class="lang-btn ${this.i18n.locale === 'en' ? 'active' : ''}" 
+                      @click=${() => setLocale('en')}>EN</span>
             </div>
         `;
     }

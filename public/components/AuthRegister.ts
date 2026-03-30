@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
 import { API } from '../api';
+import { LocalizeController } from '../../client/locales/locales';
 
 @customElement('auth-register')
 export class AuthRegister extends LitElement {
@@ -9,11 +10,20 @@ export class AuthRegister extends LitElement {
     @state() private password = '';
     @state() private loading = false;
     @state() private error = '';
+    private i18n: LocalizeController = new LocalizeController(this);
 
     static styles = css`
         :host { 
             display: block; 
             color: var(--text-main);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .form-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
         }
         h2 { 
             margin-top: 0; 
@@ -41,6 +51,9 @@ export class AuthRegister extends LitElement {
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(192, 38, 211, 0.1);
         }
+        .actions {
+            margin-top: auto;
+        }
         button { 
             width: 100%; 
             padding: 16px; 
@@ -49,7 +62,7 @@ export class AuthRegister extends LitElement {
             background: var(--bg-gradient); 
             color: white; 
             font-weight: 700; 
-            font-size: 1em;
+            font-size: 1.1em;
             cursor: pointer; 
             transition: all 0.3s; 
             font-family: 'Inter', sans-serif;
@@ -73,10 +86,11 @@ export class AuthRegister extends LitElement {
             font-size: 0.85em; 
             margin-top: 15px; 
             text-align: center;
+            min-height: 20px;
         }
         .footer {
             text-align: center;
-            margin-top: 20px;
+            margin-top: 25px;
             font-size: 0.9em;
             color: var(--text-muted);
         }
@@ -111,21 +125,27 @@ export class AuthRegister extends LitElement {
 
     render() {
         return html`
-            <div class="input-group">
-                <input type="text" placeholder="Username" @input=${(e: any) => this.username = e.target.value}>
-            </div>
-            <div class="input-group">
-                <input type="email" placeholder="Email Address" @input=${(e: any) => this.email = e.target.value}>
-            </div>
-            <div class="input-group">
-                <input type="password" placeholder="Password" @input=${(e: any) => this.password = e.target.value}>
-            </div>
-            <button @click=${this.register} ?disabled=${this.loading}>
-                ${this.loading ? 'Creating...' : 'Signup'}
-            </button>
-            ${this.error ? html`<div class="error">${this.error}</div>` : ''}
-            <div class="footer">
-                Already have an account? <span @click=${() => this.dispatchEvent(new CustomEvent('switch-tab', { detail: 'login' }))}>Login now</span>
+            <div class="form-container">
+                <div class="input-group">
+                    <input type="text" placeholder="${this.i18n.t('auth.username')}" @input=${(e: any) => this.username = e.target.value}>
+                </div>
+                <div class="input-group">
+                    <input type="email" placeholder="${this.i18n.t('auth.email')}" @input=${(e: any) => this.email = e.target.value}>
+                </div>
+                <div class="input-group">
+                    <input type="password" placeholder="${this.i18n.t('auth.password')}" @input=${(e: any) => this.password = e.target.value}>
+                </div>
+                
+                <div class="actions">
+                    <button @click=${this.register} ?disabled=${this.loading}>
+                        ${this.loading ? this.i18n.t('auth.loading') : this.i18n.t('auth.signupButton')}
+                    </button>
+                    <div class="error">${this.error}</div>
+                </div>
+
+                <div class="footer">
+                    ${this.i18n.t('auth.hasAccount')} <span @click=${() => this.dispatchEvent(new CustomEvent('switch-tab', { detail: 'login' }))}>${this.i18n.t('auth.loginNow')}</span>
+                </div>
             </div>
         `;
     }

@@ -81,5 +81,24 @@
   "labels.message": "Message",
   "labels.tier": "Subscription tier",
   "labels.isNew": "New follower",
-  "labels.isGift": "Gifted subscription"
+  "labels.isGift": "Gifted subscription",
+  
+  "auth.login": "Login",
+  "auth.signup": "Signup",
+  "auth.identifier": "Email or Username",
+  "auth.email": "Email Address",
+  "auth.username": "Username",
+  "auth.password": "Password",
+  "auth.forgotPassword": "Forgot password?",
+  "auth.loginButton": "Login",
+  "auth.signupButton": "Signup",
+  "auth.noAccount": "Not a member?",
+  "auth.hasAccount": "Already have an account?",
+  "auth.loginNow": "Login now",
+  "auth.signupNow": "Signup now",
+  "auth.welcome": "Welcome back, {name}!",
+  "auth.logout": "Logout",
+  "auth.filesStored": "Files Stored",
+  "auth.storageCapacity": "Storage Capacity",
+  "auth.loading": "Loading..."
 }

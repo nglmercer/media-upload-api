@@ -81,5 +81,24 @@
   "labels.message": "Mensaje",
   "labels.tier": "Nivel de suscripción",
   "labels.isNew": "Nuevo seguidor",
-  "labels.isGift": "Suscripción regalada"
+  "labels.isGift": "Suscripción regalada",
+  
+  "auth.login": "Iniciar Sesión",
+  "auth.signup": "Registrarse",
+  "auth.identifier": "Correo o Usuario",
+  "auth.email": "Correo Electrónico",
+  "auth.username": "Nombre de Usuario",
+  "auth.password": "Contraseña",
+  "auth.forgotPassword": "¿Olvidaste tu contraseña?",
+  "auth.loginButton": "Ingresar",
+  "auth.signupButton": "Registrarse",
+  "auth.noAccount": "¿No tienes cuenta?",
+  "auth.hasAccount": "¿Ya tienes cuenta?",
+  "auth.loginNow": "Inicia sesión",
+  "auth.signupNow": "Regístrate ahora",
+  "auth.welcome": "¡Bienvenido, {name}!",
+  "auth.logout": "Cerrar Sesión",
+  "auth.filesStored": "Archivos Guardados",
+  "auth.storageCapacity": "Capacidad de Almacenamiento",
+  "auth.loading": "Cargando..."
 }

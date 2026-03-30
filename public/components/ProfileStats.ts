@@ -1,12 +1,14 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { API } from '../api';
+import { LocalizeController } from '../../client/locales/locales';
 
 @customElement('profile-stats')
 export class ProfileStats extends LitElement {
     @state() private user: any = null;
     @state() private stats: any = null;
     @state() private loading = true;
+    private i18n = new LocalizeController(this);
 
     static styles = css`
         :host { 
@@ -94,6 +96,11 @@ export class ProfileStats extends LitElement {
         }
     `;
 
+    connectedCallback() {
+        super.connectedCallback();
+        this.loadData();
+    }
+
     async loadData() {
         try {
             const [info, quota] = await Promise.all([
@@ -116,8 +123,8 @@ export class ProfileStats extends LitElement {
     }
 
     render() {
-        if (this.loading) return html`<div class="loading">Loading dashboard...</div>`;
-        if (!this.user) return html`<div class="loading">Error loading user</div>`;
+        if (this.loading) return html`<div class="loading">${this.i18n.t('auth.loading')}</div>`;
+        if (!this.user) return html`<div class="loading">Error</div>`;
         
         const fileProgress = Math.min(100, (this.stats?.usedFiles / this.stats?.maxFiles) * 100 || 0);
         const storageProgress = Math.min(100, (this.stats?.usedStorage / this.stats?.maxStorage) * 100 || 0);
@@ -125,22 +132,22 @@ export class ProfileStats extends LitElement {
         return html`
             <div class="header">
                 <div>
-                   <h2>Hello, ${this.user.label || 'User'}!</h2>
+                   <h2>${this.i18n.t('auth.welcome', { name: this.user.label || 'User' })}</h2>
                    <div class="user-id">ID: ${this.user.userId}</div>
                 </div>
-                <button class="logout" @click=${this.logout}>Logout</button>
+                <button class="logout" @click=${this.logout}>${this.i18n.t('auth.logout')}</button>
             </div>
             
             <div class="grid">
                 <div class="stat-card">
-                    <div class="label">Files Stored</div>
+                    <div class="label">${this.i18n.t('auth.filesStored')}</div>
                     <div class="value">${this.stats?.usedFiles ?? 0} <span style="font-size: 0.5em; color: var(--text-muted);">/ ${this.stats?.maxFiles ?? '∞'}</span></div>
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: ${fileProgress}%"></div>
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="label">Storage Capacity</div>
+                    <div class="label">${this.i18n.t('auth.storageCapacity')}</div>
                     <div class="value">${((this.stats?.usedStorage ?? 0) / 1024 / 1024).toFixed(1)} <span style="font-size: 0.5em; color: var(--text-muted);">MB</span></div>
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: ${storageProgress}%; opacity: 0.8;"></div>
