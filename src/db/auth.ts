@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { users, sessions, loginAttempts } from "./schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { randomBytes } from "crypto";
 /**const password = "super-secure-pa$$word";
 
@@ -24,14 +24,24 @@ export async function register(
       throw new Error("La contraseña debe tener al menos 8 caracteres");
     }
 
-    const existing = await db
+    const existingEmail = await db
       .select()
       .from(users)
       .where(eq(users.email, email))
       .limit(1);
 
-    if (existing.length > 0) {
+    if (existingEmail.length > 0) {
       throw new Error("Este email ya está registrado");
+    }
+
+    const existingUsername = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
+
+    if (existingUsername.length > 0) {
+      throw new Error("Este nombre de usuario ya está registrado");
     }
 
     const passwordHash = await Bun.password.hash(password);
@@ -55,21 +65,21 @@ export async function register(
   }
 }
 
-export async function login(email: string, password: string) {
+export async function login(identifier: string, password: string) {
   try {
-    if (!email || !password) {
-      throw new Error("Email y contraseña son requeridos");
+    if (!identifier || !password) {
+      throw new Error("Usuario/Email y contraseña son requeridos");
     }
 
     const user = await db
       .select()
       .from(users)
-      .where(eq(users.email, email))
+      .where(or(eq(users.email, identifier), eq(users.username, identifier)))
       .limit(1);
 
     if (user.length === 0) {
       await db.insert(loginAttempts).values({
-        email,
+        email: identifier,
         success: 0,
       });
       throw new Error("Credenciales inválidas");
@@ -82,7 +92,7 @@ export async function login(email: string, password: string) {
 
     if (!isPasswordValid) {
       await db.insert(loginAttempts).values({
-        email,
+        email: identifier,
         success: 0,
       });
       throw new Error("Credenciales inválidas");
@@ -98,7 +108,7 @@ export async function login(email: string, password: string) {
     });
 
     await db.insert(loginAttempts).values({
-      email,
+      email: user[0].email,
       success: 1,
     });
 

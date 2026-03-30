@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media API - Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+    <script type="module" src="./index.ts"></script>
+    <style>
+        :root { 
+            --primary: #c026d3; 
+            --accent: #ec4899; 
+            --bg-gradient: linear-gradient(135deg, #c026d3 0%, #ec4899 100%);
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --input-bg: #ffffff;
+            --input-border: #e2e8f0;
+            --body-bg: #f1f5f9;
+            --shadow: 0 10px 25px rgba(0,0,0,0.1);
+            --radius-main: 16px;
+            --radius-inner: 8px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --card-bg: #1e293b;
+                --text-main: #f8fafc;
+                --text-muted: #94a3b8;
+                --input-bg: rgba(15, 23, 42, 0.5);
+                --input-border: rgba(255, 255, 255, 0.1);
+                --body-bg: #0f172a;
+                --shadow: 0 10px 30px rgba(0,0,0,0.4);
+            }
+        }
+
+        body { 
+            margin: 0; 
+            background: var(--body-bg); 
+            color: var(--text-main); 
+            min-height: 100vh; 
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        h1 { 
+            text-align: center; 
+            margin-bottom: 40px; 
+            font-family: 'Outfit', sans-serif; 
+            font-size: 3.5em; 
+            letter-spacing: -0.05em;
+            background: var(--bg-gradient); 
+            background-clip: text; 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+        }
+    </style>
+</head>
+<body>
+    <h1>Media Cloud</h1>
+    <auth-dashboard></auth-dashboard>
+</body>
+</html>

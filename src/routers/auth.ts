@@ -21,7 +21,8 @@ async function registerHandler(req: Request) {
 async function loginHandler(req: Request) {
   try {
     const body = await req.json();
-    const result = await login(body.email, body.password);
+    const identifier = body.identifier || body.email || body.username;
+    const result = await login(identifier, body.password);
     return json(result, result.success ? 200 : 401);
   } catch (error) {
     return json({ success: false, message: "Invalid request body" }, 400);

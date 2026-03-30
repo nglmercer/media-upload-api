@@ -6,7 +6,7 @@ import { handleRequest } from './app'
 // Import Discovery (optional)
 import { type Discovery as DiscoveryType } from './discover'
 import { initDiscovery } from './discover/init'
-
+import loginHtml from '../public/index.html'
 /**
  * Start the HTTP/WebSocket server
  * @param options - Server options
@@ -61,6 +61,9 @@ export function startServer(options?: { port?: number }): ReturnType<typeof Bun.
       drain(ws: ServerWebSocket<WebSocketData>) {
         // Handle backpressure if needed
       }
+    },
+    routes: {
+      "/": loginHtml,
     }
   });
 

@@ -29,7 +29,6 @@ export const authMiddleware = async (req: Request, ctx: ServerContext): Promise<
 
   if (!token) {
     // If no token, we set as unauthenticated but continue
-    // Specific routes will check ctx.auth.authenticated
     ctx.auth = {
       authenticated: false,
       userId: null,
@@ -63,8 +62,15 @@ export const authMiddleware = async (req: Request, ctx: ServerContext): Promise<
     return null;
   }
 
-  // If token was provided but is invalid
-  return unauthorized('Invalid or expired token');
+  // If token was provided but is invalid, we still allow to proceed
+  // but marked as NOT authenticated.
+  ctx.auth = {
+    authenticated: false,
+    userId: null,
+    permissions: [],
+    tokenLabel: null,
+  };
+  return null;
 };
 
 /**

@@ -22,6 +22,6 @@
     "skipLibCheck": true,
     "outDir": "./dist"
   },
-  "include": ["src/**/*.ts", "alerts/**/*.ts", "client/**/*.ts"],
+  "include": ["src/**/*.ts", "alerts/**/*.ts", "client/**/*.ts", "public/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

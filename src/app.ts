@@ -35,11 +35,24 @@ export async function handleRequest(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: defaultHeaders });
   }
-
-  // 3. Static Files (Equivalent to serveStatic)
+  // 3. Static Files (Uploads)
   if (url.pathname.startsWith('/uploads/')) {
     const filePath = `.${url.pathname}`;
     const file = Bun.file(filePath);
+    if (await file.exists()) {
+      return new Response(file, { 
+        headers: {
+          ...defaultHeaders,
+          'Content-Type': file.type,
+        }
+      });
+    }
+  }
+
+  // 4. Static Files (Public)
+  if (!url.pathname.startsWith('/api/')) {
+    const publicPath = `./public${url.pathname === '/' ? '/index.html' : url.pathname}`;
+    const file = Bun.file(publicPath);
     if (await file.exists()) {
       return new Response(file, { 
         headers: {
