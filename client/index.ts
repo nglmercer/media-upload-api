@@ -14,20 +14,32 @@ import { WidgetEvents, WidgetEventTypes } from './events';
 /**
  * MediaLibrary — UI component for browsing, uploading, and selecting media.
  *
- * Uses the SDK client from `src/client` directly.
- * For headless (no-UI) usage, instantiate `createBrowserClient` directly
- * and expose it on `window` — see `index.html` for examples.
+ * Two modes:
+ *  - `picker` (default): modal for selecting a file (shows confirm/cancel buttons)
+ *  - `manage`: full file management dashboard (download, details, no confirm button)
  *
- * @example
+ * Type filter:
+ *  - `image`, `sound`, `video`: filter to that type only
+ *  - `all`: show everything (with category dropdown filter in toolbar)
+ *
+ * @example picker mode
  * ```html
- * <media-library type="image"></media-library>
+ * <media-library type="image" @media-select=${handler}></media-library>
+ * ```
+ *
+ * @example manage mode
+ * ```html
+ * <media-library type="all" mode="manage"></media-library>
  * ```
  */
 @Component('media-library')
 export class MediaLibrary extends LitElement {
   // ── Public API ──────────────────────────────────────────────────────────
-  /** Filter files by type shown in the grid */
-  @property({ type: String }) type: 'image' | 'sound' | 'video' = 'image';
+  /** Filter files by type shown in the grid. 'all' shows every file. */
+  @property({ type: String }) type: 'image' | 'sound' | 'video' | 'all' = 'image';
+
+  /** Component mode: 'picker' shows confirm/cancel, 'manage' shows details/download */
+  @property({ type: String }) mode: 'picker' | 'manage' = 'picker';
 
   /**
    * The currently-selected URL in the parent (used to pre-highlight the
@@ -54,14 +66,11 @@ export class MediaLibrary extends LitElement {
   @state() private quotaMax = 0;
   @state() private isDragging = false;
   @state() private uploadQueue: { file: File; progress: number; error?: string; completed: boolean }[] = [];
+  @state() private filterCategory = 'all';
+  @state() private viewMode: 'grid' | 'list' = 'grid';
+
   private apiClient!: MediaUploadClient;
 
-  /**
-   * ID of the item whose audio is currently playing.
-   * Kept here (not in the child) so the parent can stop the old
-   * player when a new card is selected — without needing queryAll
-   * across shadow boundaries.
-   */
   @state() private playingItemId: string | null = null;
 
   private readonly ITEMS_PER_PAGE = 6;
@@ -87,10 +96,6 @@ export class MediaLibrary extends LitElement {
     WidgetEvents.emit(WidgetEventTypes.ML_CLOSE, {});
   }
 
-  /**
-   * Once items arrive, try to sync the pre-selection from `selectedUrl`.
-   * We only do this once (when `selectedItem` is still null).
-   */
   updated(changedProperties: Map<string, unknown>) {
     const itemsArrived = changedProperties.has('items') && this.items.length > 0;
     const urlChanged   = changedProperties.has('selectedUrl');
@@ -143,7 +148,7 @@ export class MediaLibrary extends LitElement {
       this.quotaUsed = q.usedStorage;
       this.quotaMax  = q.maxStorage;
     } catch {
-      // Non-fatal — hide quota bar gracefully
+      // Non-fatal
     }
   }
 
@@ -259,6 +264,22 @@ export class MediaLibrary extends LitElement {
     }
   }
 
+  private async handleDownload(item: FileItem) {
+    try {
+      const blob = await this.apiClient.files.download(item.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = item.originalName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      this.error = err.message || 'Download failed';
+    }
+  }
+
   private handleItemSelect(e: CustomEvent<{ item: FileItem }>) {
     const { item } = e.detail;
     this.selectedItem = item.id;
@@ -307,10 +328,18 @@ export class MediaLibrary extends LitElement {
 
   // ── Computed (pure, no side-effects) ────────────────────────────────────
   private _filteredAndSorted(): FileItem[] {
+    let filtered = this.items;
+
+    // Category filter (manage mode with type="all")
+    if (this.filterCategory !== 'all') {
+      filtered = filtered.filter(f => f.category === this.filterCategory);
+    }
+
+    // Search filter
     const q = this.searchQuery.toLowerCase().trim();
-    const filtered = q
-      ? this.items.filter(f => f.originalName.toLowerCase().includes(q))
-      : this.items;
+    if (q) {
+      filtered = filtered.filter(f => f.originalName.toLowerCase().includes(q));
+    }
 
     return [...filtered].sort((a, b) => {
       switch (this.sortBy) {
@@ -328,6 +357,22 @@ export class MediaLibrary extends LitElement {
   private formatBytes(bytes: number): string {
     if (bytes === 0) return '0 MB';
     return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  private formatDate(ts: number): string {
+    return new Date(ts).toLocaleString();
+  }
+
+  private getCategoryLabel(cat: string): string {
+    switch (cat) {
+      case 'image': return 'Image';
+      case 'audio': return 'Audio';
+      case 'video': return 'Video';
+      case 'document': return 'Document';
+      case 'archive': return 'Archive';
+      case 'application': return 'Application';
+      default: return cat.charAt(0).toUpperCase() + cat.slice(1);
+    }
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────
@@ -349,12 +394,42 @@ export class MediaLibrary extends LitElement {
   private renderHeader() {
     return html`
       <div class="header">
-        <h2>${this._localize.t('media.resourceLibrary')}</h2>
-        <button class="header-close" @click="${this.handleClose}" title="Close">
-          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
+        <div class="header-left">
+          <h2>${this._localize.t('media.resourceLibrary')}</h2>
+          <span class="header-count">${this.items.length} file${this.items.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="header-right">
+          ${this.mode === 'manage' ? html`
+            <button
+              class="view-toggle-btn ${this.viewMode === 'grid' ? 'active' : ''}"
+              @click="${() => { this.viewMode = 'grid'; }}"
+              title="Grid view"
+            >
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+            </button>
+            <button
+              class="view-toggle-btn ${this.viewMode === 'list' ? 'active' : ''}"
+              @click="${() => { this.viewMode = 'list'; }}"
+              title="List view"
+            >
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="3" rx="1"/>
+                <rect x="3" y="10.5" width="18" height="3" rx="1"/>
+                <rect x="3" y="17" width="18" height="3" rx="1"/>
+              </svg>
+            </button>
+          ` : ''}
+          <button class="header-close" @click="${this.handleClose}" title="Close">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
       </div>
     `;
   }
@@ -378,6 +453,27 @@ export class MediaLibrary extends LitElement {
             }}"
           />
         </div>
+
+        ${this.type === 'all' || this.mode === 'manage' ? html`
+          <div class="filter-container">
+            <select
+              class="sort-select"
+              .value="${this.filterCategory}"
+              @change="${(e: Event) => {
+                this.filterCategory = (e.target as HTMLSelectElement).value;
+                this.currentPage = 1;
+              }}"
+            >
+              <option value="all">All types</option>
+              <option value="image">Images</option>
+              <option value="audio">Audio</option>
+              <option value="video">Video</option>
+              <option value="document">Documents</option>
+              <option value="archive">Archives</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        ` : ''}
 
         <div class="sort-container">
           <label>${this._localize.t('media.sortBy')}</label>
@@ -426,7 +522,7 @@ export class MediaLibrary extends LitElement {
             type="file"
             style="display:none"
             @change="${this.handleUpload}"
-            accept="${this.type === 'sound' ? 'audio/*,.ogg,.wav,.mp3,video/*' : 'image/*,video/*'}"
+            accept="${this.type === 'sound' ? 'audio/*,.ogg,.wav,.mp3,video/*' : '*/*'}"
             ?disabled="${this.uploading}"
             multiple
           />
@@ -498,16 +594,21 @@ export class MediaLibrary extends LitElement {
 
     if (currentItems.length === 0) {
       const hasSearch = this.searchQuery.trim().length > 0;
+      const hasFilter = this.filterCategory !== 'all';
       return html`
         <div class="empty-state">
           <svg style="width:3rem;height:3rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
               d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
           </svg>
-          <p>${hasSearch ? 'No files match your search.' : 'No files uploaded yet.'}</p>
-          ${!hasSearch ? html`<small>Upload your first file using the button above.</small>` : ''}
+          <p>${hasSearch ? 'No files match your search.' : hasFilter ? 'No files in this category.' : 'No files uploaded yet.'}</p>
+          ${!hasSearch && !hasFilter ? html`<small>Upload your first file using the button above.</small>` : ''}
         </div>
       `;
+    }
+
+    if (this.viewMode === 'list') {
+      return this.renderListView(currentItems);
     }
 
     return html`
@@ -518,13 +619,62 @@ export class MediaLibrary extends LitElement {
             .item="${item}"
             .selected="${this.selectedItem === item.id}"
             .isPlayingExternal="${this.playingItemId === item.id}"
-            .muted="${this.type === 'image'}"
+            .muted="${this.type === 'image' || this.type === 'all'}"
             @ml-select="${this.handleItemSelect}"
             @ml-delete="${this.handleDelete}"
             @ml-play-start="${this.handleItemPlayStart}"
             @ml-play-stop="${this.handleItemPlayStop}"
           ></media-library-item>
         `)}
+      </div>
+    `;
+  }
+
+  private renderListView(currentItems: FileItem[]) {
+    return html`
+      <div class="list-view">
+        ${currentItems.map(item => {
+          const isSelected = this.selectedItem === item.id;
+          const url = this.apiClient.files.getUrl(item);
+          const isImage = item.mimeType?.startsWith('image/');
+          return html`
+            <div
+              class="list-item ${isSelected ? 'selected' : ''}"
+              @click="${() => { this.selectedItem = item.id; }}"
+            >
+              <div class="list-item-preview">
+                ${isImage
+                  ? html`<img src="${url}" alt="${item.originalName}" />`
+                  : html`<span class="list-item-icon">${item.category === 'audio' ? '\uD83C\uDFB5' : item.category === 'video' ? '\uD83C\uDFA5' : '\uD83D\uDCC4'}</span>`
+                }
+              </div>
+              <div class="list-item-info">
+                <div class="list-item-name">${item.originalName}</div>
+                <div class="list-item-meta">
+                  <span class="list-item-category">${this.getCategoryLabel(item.category)}</span>
+                  <span>${item.mimeType || 'unknown'}</span>
+                  <span>${this.formatBytes(item.size)}</span>
+                  <span>${this.formatDate(item.uploadedAt)}</span>
+                </div>
+              </div>
+              <div class="list-item-actions">
+                <button class="list-action-btn" @click="${(e: Event) => { e.stopPropagation(); this.handleDownload(item); }}" title="Download">
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                  </svg>
+                </button>
+                <button class="list-action-btn delete" @click="${(e: Event) => {
+                  e.stopPropagation();
+                  this.handleDelete(new CustomEvent('ml-delete', { detail: { id: item.id } }));
+                }}" title="Delete">
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          `;
+        })}
       </div>
     `;
   }
@@ -566,10 +716,11 @@ export class MediaLibrary extends LitElement {
     const safePage   = Math.min(this.currentPage, totalPages);
     const start      = (safePage - 1) * this.ITEMS_PER_PAGE;
     const pageItems  = allItems.slice(start, start + this.ITEMS_PER_PAGE);
+    const showDetails = this.mode === 'manage' && !!this.selectedItem;
 
     return html`
       <div
-        class="modal ${this.isDragging ? 'dragging' : ''}"
+        class="modal ${this.isDragging ? 'dragging' : ''} ${showDetails ? 'with-details' : ''}"
         @dragenter="${this.handleDragEnter}"
         @dragleave="${this.handleDragLeave}"
         @dragover="${this.handleDragOver}"
@@ -580,9 +731,11 @@ export class MediaLibrary extends LitElement {
         ${this.renderToolbar()}
         ${this.renderStatsBar()}
 
-        <div class="content">
+        <div class="content ${showDetails ? 'content-split' : ''}">
           ${this.error ? html`<div class="error-msg">${this.error}</div>` : ''}
-          ${this.renderGrid(pageItems)}
+          <div class="content-main">
+            ${this.renderGrid(pageItems)}
+          </div>
         </div>
 
         <div class="footer">
@@ -590,15 +743,17 @@ export class MediaLibrary extends LitElement {
 
           <div class="footer-actions">
             <button class="btn-cancel" @click="${this.handleClose}">
-              ${this._localize.t('app.cancel')}
+              ${this.mode === 'manage' ? (this._localize.t('app.cancel') || 'Close') : this._localize.t('app.cancel')}
             </button>
-            <button
-              class="btn-add"
-              ?disabled="${!this.selectedItem}"
-              @click="${this.handleConfirmSelection}"
-            >
-              ${this._localize.t('media.addToAlerts')}
-            </button>
+            ${this.mode === 'picker' ? html`
+              <button
+                class="btn-add"
+                ?disabled="${!this.selectedItem}"
+                @click="${this.handleConfirmSelection}"
+              >
+                ${this._localize.t('media.addToAlerts')}
+              </button>
+            ` : ''}
           </div>
         </div>
       </div>

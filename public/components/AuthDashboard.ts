@@ -4,18 +4,20 @@ import { LocalizeController, setLocale } from '../../client/locales/locales';
 import './AuthLogin';
 import './AuthRegister';
 import './ProfileStats';
+import '../../client/index';
 
 @customElement('auth-dashboard')
 export class AuthDashboard extends LitElement {
     @state() private authenticated = !!localStorage.getItem('session_id');
     @state() private activeTab: 'login' | 'signup' = 'login';
+    @state() private showLibrary = false;
     private i18n: LocalizeController = new LocalizeController(this);
 
     static styles = css`
-        :host { 
-            display: block; 
+        :host {
+            display: block;
             width: 100%;
-            max-width: 400px; 
+            max-width: 960px;
             margin: 0 auto;
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
         }
@@ -92,8 +94,22 @@ export class AuthDashboard extends LitElement {
         if (this.authenticated) {
             return html`
                 <div class="card" style="max-width: 800px; margin: 0 auto;">
-                    <profile-stats @logout=${() => this.authenticated = false}></profile-stats>
+                    <profile-stats
+                        @logout=${() => this.authenticated = false}
+                        @open-files=${() => this.showLibrary = true}
+                    ></profile-stats>
                 </div>
+                ${this.showLibrary ? html`
+                    <media-library
+                        type="all"
+                        mode="manage"
+                        @media-close=${() => this.showLibrary = false}
+                        @media-select=${(e: CustomEvent) => {
+                            console.log('[Dashboard] Selected:', e.detail);
+                            this.showLibrary = false;
+                        }}
+                    ></media-library>
+                ` : ''}
             `;
         }
 

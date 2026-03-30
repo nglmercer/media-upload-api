@@ -11,8 +11,8 @@ export class ProfileStats extends LitElement {
     private i18n = new LocalizeController(this);
 
     static styles = css`
-        :host { 
-            display: block; 
+        :host {
+            display: block;
             color: var(--text-main);
             padding: 24px;
         }
@@ -22,8 +22,8 @@ export class ProfileStats extends LitElement {
             align-items: center;
             margin-bottom: 30px;
         }
-        h2 { 
-            margin: 0; 
+        h2 {
+            margin: 0;
             font-family: 'Outfit', sans-serif;
             font-size: 1.8em;
             background: var(--bg-gradient);
@@ -36,27 +36,32 @@ export class ProfileStats extends LitElement {
             font-family: monospace;
             margin-top: 4px;
         }
-        .grid { 
-            display: grid; 
-            grid-template-columns: 1fr; 
-            gap: 20px; 
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
-        .stat-card { 
-            background: var(--input-bg); 
-            padding: 20px; 
-            border-radius: var(--radius-inner); 
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        .stat-card {
+            background: var(--input-bg);
+            padding: 20px;
+            border-radius: var(--radius-inner);
             border: 1px solid var(--input-border);
         }
-        .label { 
-            font-size: 0.85em; 
-            color: var(--text-muted); 
+        .label {
+            font-size: 0.85em;
+            color: var(--text-muted);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        .value { 
-            font-size: 1.8em; 
-            font-weight: 700; 
+        .value {
+            font-size: 1.8em;
+            font-weight: 700;
             margin-top: 8px;
             font-family: 'Outfit', sans-serif;
         }
@@ -73,22 +78,37 @@ export class ProfileStats extends LitElement {
             border-radius: 4px;
             transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .logout { 
-            padding: 8px 16px; 
-            border: 1px solid #ef4444; 
-            border-radius: var(--radius-inner); 
-            color: #ef4444; 
+        .btn-manage {
+            padding: 8px 16px;
+            border: 1px solid var(--primary);
+            border-radius: var(--radius-inner);
+            color: var(--primary);
             background: transparent;
-            cursor: pointer; 
+            cursor: pointer;
             font-weight: 600;
             font-size: 0.9em;
             transition: all 0.2s;
         }
-        .logout:hover { 
-            background: #ef4444; 
-            color: white; 
+        .btn-manage:hover {
+            background: var(--primary);
+            color: white;
         }
-        
+        .logout {
+            padding: 8px 16px;
+            border: 1px solid #ef4444;
+            border-radius: var(--radius-inner);
+            color: #ef4444;
+            background: transparent;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .logout:hover {
+            background: #ef4444;
+            color: white;
+        }
+
         .loading {
             text-align: center;
             padding: 40px;
@@ -135,7 +155,12 @@ export class ProfileStats extends LitElement {
                    <h2>${this.i18n.t('auth.welcome', { name: this.user.label || 'User' })}</h2>
                    <div class="user-id">ID: ${this.user.userId}</div>
                 </div>
-                <button class="logout" @click=${this.logout}>${this.i18n.t('auth.logout')}</button>
+                <div class="header-actions">
+                    <button class="btn-manage" @click=${() => this.dispatchEvent(new CustomEvent('open-files'))}>
+                        ${this.i18n.t('media.resourceLibrary') || 'Manage Files'}
+                    </button>
+                    <button class="logout" @click=${this.logout}>${this.i18n.t('auth.logout')}</button>
+                </div>
             </div>
             
             <div class="grid">
