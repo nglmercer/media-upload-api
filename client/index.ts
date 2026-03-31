@@ -97,6 +97,10 @@ export class MediaLibrary extends LitElement {
   }
 
   updated(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has('type')) {
+      this.fetchFiles();
+    }
+
     const itemsArrived = changedProperties.has('items') && this.items.length > 0;
     const urlChanged   = changedProperties.has('selectedUrl');
 
