@@ -1,6 +1,6 @@
 {
   "@@locale": "es",
-  "app.title": "Overlay Framework",
+  "app.title": "Media Cloud",
   "app.dashboard": "Panel de Control",
   "app.editor": "Editor de Alertas",
   "app.back": "Regresar",
@@ -100,5 +100,8 @@
   "auth.logout": "Cerrar Sesión",
   "auth.filesStored": "Archivos Guardados",
   "auth.storageCapacity": "Capacidad de Almacenamiento",
-  "auth.loading": "Cargando..."
+  "auth.loading": "Cargando...",
+  "auth.obsTitle": "Fuente de Navegador OBS",
+  "auth.copyUrl": "Copiar URL",
+  "auth.copied": "¡Copiado!"
 }

@@ -4,6 +4,7 @@ import { LocalizeController, setLocale } from '../../client/locales/locales';
 import './AuthLogin';
 import './AuthRegister';
 import './ProfileStats';
+import './AlertSourceInfo';
 import '../../client/index';
 
 @customElement('auth-dashboard')
@@ -20,6 +21,20 @@ export class AuthDashboard extends LitElement {
             max-width: 960px;
             margin: 0 auto;
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            padding-top: 50px;
+        }
+        h1 { 
+            text-align: center; 
+            margin-bottom: 40px; 
+            font-family: 'Outfit', sans-serif; 
+            font-size: 3.5em; 
+            letter-spacing: -0.05em;
+            background: var(--bg-gradient); 
+            background-clip: text; 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+            margin-top: 0;
         }
         .card {
             background: var(--card-bg);
@@ -91,28 +106,33 @@ export class AuthDashboard extends LitElement {
     }
 
     render() {
+        return html`
+            <h1>${this.i18n.t('app.title')}</h1>
+            ${this.renderContent()}
+        `;
+    }
+
+    private renderContent() {
         if (this.authenticated) {
             return html`
                 <div class="card" style="max-width: 800px; margin: 0 auto;">
                     <profile-stats
                         @logout=${() => this.authenticated = false}
                         @open-files=${() => this.showLibrary = true}
-                    ></profile-stats>
+                    >
+                        <alert-source-info></alert-source-info>
+                    </profile-stats>
                 </div>
                 ${this.showLibrary ? html`
                     <media-library
                         type="all"
-                        mode="manage"
+                        mode="picker"
                         @media-close=${() => this.showLibrary = false}
-                        @media-select=${(e: CustomEvent) => {
-                            console.log('[Dashboard] Selected:', e.detail);
-                            this.showLibrary = false;
-                        }}
+                        @media-select=${(e: CustomEvent) => this.handleMediaSelect(e)}
                     ></media-library>
                 ` : ''}
             `;
         }
-
         return html`
             <div class="card">
                 <div class="tabs">
@@ -136,5 +156,41 @@ export class AuthDashboard extends LitElement {
                       @click=${() => setLocale('en')}>EN</span>
             </div>
         `;
+    }
+
+    private async handleMediaSelect(e: CustomEvent) {
+        const { selected: file } = e.detail;
+        console.log('[Dashboard] Selected file for alert:', file);
+        this.showLibrary = false;
+
+        const token = localStorage.getItem('session_id') || '';
+        const payload: any = {
+            duration: 5000,
+            volume: 1,
+            muted: false
+        };
+
+        if (file.category === 'video') payload.video = file.url;
+        else if (file.category === 'audio') payload.audio = file.url;
+        else if (file.category === 'image') payload.image = file.url;
+
+        try {
+            const res = await fetch('/api/alerts/trigger', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            if (result.success) {
+                console.log('Alert triggered successfully');
+            } else {
+                console.error('Failed to trigger alert:', result.error);
+            }
+        } catch (err) {
+            console.error('Error triggering alert:', err);
+        }
     }
 }
