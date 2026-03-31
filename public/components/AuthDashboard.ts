@@ -4,6 +4,7 @@ import { LocalizeController, setLocale } from '../../client/locales/locales';
 import './AuthLogin';
 import './AuthRegister';
 import './ProfileStats';
+import './AlertSourceInfo';
 import '../../client/index';
 
 @customElement('auth-dashboard')
@@ -20,6 +21,20 @@ export class AuthDashboard extends LitElement {
             max-width: 960px;
             margin: 0 auto;
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            padding-top: 50px;
+        }
+        h1 { 
+            text-align: center; 
+            margin-bottom: 40px; 
+            font-family: 'Outfit', sans-serif; 
+            font-size: 3.5em; 
+            letter-spacing: -0.05em;
+            background: var(--bg-gradient); 
+            background-clip: text; 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+            margin-top: 0;
         }
         .card {
             background: var(--card-bg);
@@ -91,6 +106,13 @@ export class AuthDashboard extends LitElement {
     }
 
     render() {
+        return html`
+            <h1>${this.i18n.t('app.title')}</h1>
+            ${this.renderContent()}
+        `;
+    }
+
+    private renderContent() {
         if (this.authenticated) {
             return html`
                 <div class="card" style="max-width: 800px; margin: 0 auto;">
@@ -98,7 +120,7 @@ export class AuthDashboard extends LitElement {
                         @logout=${() => this.authenticated = false}
                         @open-files=${() => this.showLibrary = true}
                     >
-                        <slot></slot>
+                        <alert-source-info></alert-source-info>
                     </profile-stats>
                 </div>
                 ${this.showLibrary ? html`
@@ -111,7 +133,6 @@ export class AuthDashboard extends LitElement {
                 ` : ''}
             `;
         }
-
         return html`
             <div class="card">
                 <div class="tabs">

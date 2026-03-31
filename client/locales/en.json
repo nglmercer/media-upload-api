@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "app.title": "Overlay Framework",
+  "app.title": "Media Cloud",
   "app.dashboard": "Dashboard",
   "app.editor": "Alert Editor",
   "app.back": "Back",
@@ -100,5 +100,8 @@
   "auth.logout": "Logout",
   "auth.filesStored": "Files Stored",
   "auth.storageCapacity": "Storage Capacity",
-  "auth.loading": "Loading..."
+  "auth.loading": "Loading...",
+  "auth.obsTitle": "OBS Browser Source",
+  "auth.copyUrl": "Copy URL",
+  "auth.copied": "Copied!"
 }
