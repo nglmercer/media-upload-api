@@ -8,7 +8,8 @@ import { type Discovery as DiscoveryType } from './discover'
 import { initDiscovery } from './discover/init'
 import loginHtml from '../public/index.html'
 import componentHtml from '../client/index.html'
-import alertsHtml from '../alerts/demo.html'
+import alertsPlayerHtml from '../public/alerts.html'
+
 /**
  * Start the HTTP/WebSocket server
  * @param options - Server options
@@ -67,7 +68,7 @@ export function startServer(options?: { port?: number }): ReturnType<typeof Bun.
     routes: {
       "/": loginHtml,
       "/components": componentHtml,
-      "/alerts": alertsHtml,
+      "/alerts/player": alertsPlayerHtml,
     }
   });
 

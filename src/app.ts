@@ -6,6 +6,7 @@ import { authRouter } from './routers/auth';
 import { configRouter } from './routers/config';
 import { filesRouter } from './routers/files';
 import { quotaRouter } from './routers/quota';
+import { alertsRouter } from './routers/alerts';
 import { json, type ServerContext } from './utils/vanilla-http';
 
 // Initialize services
@@ -78,7 +79,8 @@ export async function handleRequest(req: Request): Promise<Response> {
   const routerRes = await authRouter(req, ctx) 
     || await configRouter(req, ctx)
     || await filesRouter(req, ctx)
-    || await quotaRouter(req, ctx);
+    || await quotaRouter(req, ctx)
+    || await alertsRouter(req, ctx);
 
   if (routerRes) {
     // Apply CORS headers to router response

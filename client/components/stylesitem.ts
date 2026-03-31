@@ -14,6 +14,7 @@ export const style = css`
   position: relative;
   height: 100%;
   box-sizing: border-box;
+  min-width: 0; /* Fix expansion by long names */
 }
 .item.selected {
   border-color: #a970ff;

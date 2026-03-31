@@ -153,7 +153,6 @@ export class ProfileStats extends LitElement {
             <div class="header">
                 <div>
                    <h2>${this.i18n.t('auth.welcome', { name: this.user.label || 'User' })}</h2>
-                   <div class="user-id">ID: ${this.user.userId}</div>
                 </div>
                 <div class="header-actions">
                     <button class="btn-manage" @click=${() => this.dispatchEvent(new CustomEvent('open-files'))}>
@@ -179,6 +178,7 @@ export class ProfileStats extends LitElement {
                     </div>
                 </div>
             </div>
+            <slot></slot>
         `;
     }
 }

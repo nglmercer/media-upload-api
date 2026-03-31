@@ -61,10 +61,51 @@
             -webkit-text-fill-color: transparent; 
             filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
         }
+        .card { background: var(--card-bg); padding: 1.5rem; border-radius: 16px; box-shadow: var(--shadow); width: auto; max-width: auto; display: none; border: 1px solid var(--input-border); transition: 0.3s; margin-top: 1rem; }
+        .card h2 { margin: 0 0 0.5rem; font-size: 1.25rem; color: var(--primary); }
+        .card p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
+
+        .url-box { display: flex; align-items: center; background: var(--input-bg); padding: 4px 4px 4px 12px; border-radius: 10px; border: 1px solid var(--input-border); gap: 8px; }
+        code { flex: 1; font-family: monospace; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main); }
+        
+        .btn-copy { background: var(--bg-gradient); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.8rem; transition: opacity 0.2s; }
+        .btn-copy:hover { opacity: 0.9; }
+        .btn-copy:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
     <h1>Media Cloud</h1>
-    <auth-dashboard></auth-dashboard>
-</body>
+    <auth-dashboard>
+        <div id="obs-info" class="card">
+            <h2>OBS Browser Source</h2>
+            <div class="url-box">
+                <code id="alert-url"></code>
+                <button class="btn-copy" onclick="copyUrl(this)">Copy URL</button>
+            </div>
+        </div>
+    </auth-dashboard>
+
+    <script>
+        const updateUI = (active) => {
+            const info = document.getElementById('obs-info');
+            const token = localStorage.getItem('session_id');
+            if (active && token) {
+                document.getElementById('alert-url').innerText = `${window.location.origin}/alerts/player?token=${token}`;
+                info.style.display = 'block';
+            } else {
+                info.style.display = 'none';
+            }
+        };
+
+        window.addEventListener('auth-changed', (e) => updateUI(e.detail));
+        if (localStorage.getItem('session_id')) updateUI(true);
+
+        async function copyUrl(btn) {
+            const url = document.getElementById('alert-url').innerText;
+            await navigator.clipboard.writeText(url);
+            const originalText = btn.innerText;
+            btn.innerText = 'Copied!';
+            setTimeout(() => btn.innerText = originalText, 2000);
+        }
+    </script></body>
 </html>

@@ -97,17 +97,16 @@ export class AuthDashboard extends LitElement {
                     <profile-stats
                         @logout=${() => this.authenticated = false}
                         @open-files=${() => this.showLibrary = true}
-                    ></profile-stats>
+                    >
+                        <slot></slot>
+                    </profile-stats>
                 </div>
                 ${this.showLibrary ? html`
                     <media-library
                         type="all"
-                        mode="manage"
+                        mode="picker"
                         @media-close=${() => this.showLibrary = false}
-                        @media-select=${(e: CustomEvent) => {
-                            console.log('[Dashboard] Selected:', e.detail);
-                            this.showLibrary = false;
-                        }}
+                        @media-select=${(e: CustomEvent) => this.handleMediaSelect(e)}
                     ></media-library>
                 ` : ''}
             `;
@@ -136,5 +135,41 @@ export class AuthDashboard extends LitElement {
                       @click=${() => setLocale('en')}>EN</span>
             </div>
         `;
+    }
+
+    private async handleMediaSelect(e: CustomEvent) {
+        const { selected: file } = e.detail;
+        console.log('[Dashboard] Selected file for alert:', file);
+        this.showLibrary = false;
+
+        const token = localStorage.getItem('session_id') || '';
+        const payload: any = {
+            duration: 5000,
+            volume: 1,
+            muted: false
+        };
+
+        if (file.category === 'video') payload.video = file.url;
+        else if (file.category === 'audio') payload.audio = file.url;
+        else if (file.category === 'image') payload.image = file.url;
+
+        try {
+            const res = await fetch('/api/alerts/trigger', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            if (result.success) {
+                console.log('Alert triggered successfully');
+            } else {
+                console.error('Failed to trigger alert:', result.error);
+            }
+        } catch (err) {
+            console.error('Error triggering alert:', err);
+        }
     }
 }

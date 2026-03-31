@@ -82,6 +82,7 @@ export const ServerConfigSchema = z.object({
   dataDir: z.string(),
   maxFileSizeBytes: z.number(),
   allowedMimeTypes: z.array(z.string()),
+  baseUrl: z.string().optional(),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']),
 });
 
@@ -106,6 +107,7 @@ const DEFAULT_SERVER_CONFIG: ServerConfig = {
   dataDir: "data",
   maxFileSizeBytes: 104857600, // 100MB
   allowedMimeTypes: [],
+  baseUrl: "",
   logLevel: "info",
 };
 

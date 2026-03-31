@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alert Player</title>
+  <style>
+      body, html {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          background: transparent;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+      }
+      #container {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          opacity: 0;
+          transition: opacity 0.5s ease-in-out, transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          transform: scale(0.8) translateY(50px);
+      }
+      #container.visible {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+      }
+      #container.exit {
+          opacity: 0;
+          transform: scale(0.8) translateY(-50px);
+      }
+      img, video {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+      }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+
+  <script>
+      let activeTimeout = null;
+      const container = document.getElementById('container');
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+
+      function authUrl(fileUrl) {
+          if (!fileUrl || !token) return fileUrl;
+          const u = new URL(fileUrl, window.location.origin);
+          u.searchParams.set('token', token);
+          return u.toString();
+      }
+
+      function playAlert(data) {
+          if (activeTimeout) {
+              clearTimeout(activeTimeout);
+              container.classList.remove('visible', 'exit');
+          }
+
+          container.innerHTML = '';
+          const { v, a, i, d, vol, m } = data;
+
+          if (i) {
+              const img = document.createElement('img');
+              img.src = authUrl(i);
+              container.appendChild(img);
+          }
+          if (v) {
+              const video = document.createElement('video');
+              video.src = authUrl(v);
+              if (m) video.muted = true;
+              video.volume = parseFloat(vol || 1);
+              container.appendChild(video);
+              video.play().catch(e => console.error("Video play failed:", e));
+          }
+          if (a) {
+              const audio = document.createElement('audio');
+              audio.src = authUrl(a);
+              audio.volume = parseFloat(vol || 1);
+              container.appendChild(audio);
+              audio.play().catch(e => console.error("Audio play failed:", e));
+          }
+
+          setTimeout(() => container.classList.add('visible'), 50);
+
+          activeTimeout = setTimeout(() => {
+              container.classList.remove('visible');
+              container.classList.add('exit');
+              activeTimeout = setTimeout(() => {
+                  container.innerHTML = '';
+                  container.classList.remove('exit');
+              }, 500);
+          }, parseInt(d || 5000));
+      }
+
+      // Check for initial parameters
+      const v = params.get('v');
+      const a = params.get('a');
+      const i = params.get('i');
+      if (v || a || i) {
+          playAlert({
+              v, a, i,
+              d: params.get('d'),
+              vol: params.get('vol'),
+              m: params.get('m') === '1'
+          });
+      }
+
+      // WebSocket listener
+      function connectWS() {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const ws = new WebSocket(protocol + '//' + window.location.host + '/ws');
+          console.log(ws);
+          ws.onopen = () => {
+              console.log("WS connected");
+          }
+          ws.onmessage = (event) => {
+              try {
+                  const { event: ev, data } = JSON.parse(event.data);
+                  if (ev === 'play-alert') {
+                      playAlert(data);
+                  }
+              } catch (e) {
+                  console.error("WS error:", e);
+              }
+          };
+
+          ws.onclose = () => {
+              console.log("WS closed, reconnecting...");
+              setTimeout(connectWS, 2000);
+          };
+      }
+
+      connectWS();
+  </script>
+</body>
+</html>

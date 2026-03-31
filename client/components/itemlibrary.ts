@@ -40,6 +40,7 @@ export class MediaLibraryItem extends LitElement {
   static styles = css`
     :host {
       display: block;
+      min-width: 0;
     }
     ${unsafeCSS(style)}
   `;
@@ -210,14 +211,7 @@ export class MediaLibraryItem extends LitElement {
           class="preview-video"
           src="${url}"
           ?muted="${this.muted}"
-          loop
           playsinline
-          @mouseenter="${(e: Event) => (e.target as HTMLVideoElement).play()}"
-          @mouseleave="${(e: Event) => {
-            const v = e.target as HTMLVideoElement;
-            v.pause();
-            v.currentTime = 0;
-          }}"
         ></video>
         ${!this.muted ? html`
           <button
