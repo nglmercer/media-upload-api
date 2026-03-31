@@ -62,6 +62,9 @@
   "media.changeVisual": "Change Visual",
   "media.changeAudio": "Change Audio",
   "media.search": "Search",
+  "media.copyUrl": "Copy URL",
+  "media.copyRequest": "Copy request (JSON)",
+  "media.requestCopied": "Request copied to clipboard",
 
   "preview.select": "Select a variant to preview",
   "preview.loading": "Loading variants...",
