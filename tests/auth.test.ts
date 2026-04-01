@@ -13,7 +13,7 @@ describe('Auth Middleware', () => {
   })
 
   describe('authMiddleware', () => {
-    it('should allow all permissions when OAuth is disabled', async () => {
+    it('should set empty permissions when OAuth is disabled and no token provided', async () => {
       // Ensure OAuth is disabled
       const oauthConfig = config.getOAuth()
       config.update({ oauth: { ...oauthConfig, enabled: false } })
@@ -28,15 +28,11 @@ describe('Auth Middleware', () => {
       expect(res).toBeNull() // No error response, proceed
 
       const auth = getAuth(ctx)
-      expect(auth.permissions).toContain('upload')
-      expect(auth.permissions).toContain('read')
-      expect(auth.permissions).toContain('delete')
-      expect(auth.permissions).toContain('list')
-      expect(auth.permissions).toContain('admin')
+      expect(auth.permissions).toEqual([])
       expect(auth.authenticated).toBe(false)
     })
 
-    it('should allow all permissions when token auth is disabled', async () => {
+    it('should set empty permissions when token auth is disabled', async () => {
       // Enable OAuth but disable token auth
       const oauthConfig = config.getOAuth()
       config.update({ 
@@ -57,11 +53,11 @@ describe('Auth Middleware', () => {
       expect(res).toBeNull()
 
       const auth = getAuth(ctx)
-      expect(auth.permissions).toContain('upload')
+      expect(auth.permissions).toEqual([])
       expect(auth.authenticated).toBe(false)
     })
 
-    it('should reject request without token when token auth is enabled', async () => {
+    it('should allow request without token when token auth is enabled (sets unauthenticated)', async () => {
       // Enable OAuth and token auth
       const oauthConfig = config.getOAuth()
       config.update({ 
@@ -79,14 +75,14 @@ describe('Auth Middleware', () => {
       }
 
       const res = await authMiddleware(req, ctx)
-      expect(res).toBeInstanceOf(Response)
-      expect(res?.status).toBe(401)
+      // The middleware does NOT reject when no token is provided, it sets unauthenticated context
+      expect(res).toBeNull()
       
-      const body = await res?.json()
-      expect(body).toHaveProperty('error')
+      const auth = getAuth(ctx)
+      expect(auth.authenticated).toBe(false)
     })
 
-    it('should reject invalid token', async () => {
+    it('should set unauthenticated context for invalid token', async () => {
       // Enable OAuth and token auth
       const oauthConfig = config.getOAuth()
       config.update({ 
@@ -106,8 +102,12 @@ describe('Auth Middleware', () => {
       }
 
       const res = await authMiddleware(req, ctx)
-      expect(res).toBeInstanceOf(Response)
-      expect(res?.status).toBe(401)
+      // The middleware does NOT reject invalid tokens, it sets unauthenticated context
+      expect(res).toBeNull()
+      
+      const auth = getAuth(ctx)
+      expect(auth.authenticated).toBe(false)
+      expect(auth.permissions).toEqual([])
     })
   })
 

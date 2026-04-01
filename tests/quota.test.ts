@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { quotaManager } from '../src/services/quota-manager'
 import { config } from '../src/config'
+import { db } from '../src/db/db'
+import { quota as quotaTable } from '../src/db/schema'
+import { eq } from 'drizzle-orm'
 import { rm, mkdir } from 'fs/promises'
 import path from 'path'
 
@@ -14,16 +17,13 @@ describe('QuotaManager', () => {
     quotaManager.clearCache()
     // Reload config to ensure fresh state
     config.reload()
+    // Clear quota table
+    await db.delete(quotaTable)
   })
 
   afterEach(async () => {
-    // Clean up usage files
-    const usageFiles = ['usage-_global.json', 'usage-testuser.json', 'usage-_anonymous.json']
-    for (const file of usageFiles) {
-      try {
-        await rm(path.join(testDataDir, file), { force: true })
-      } catch {}
-    }
+    // Clear quota table
+    await db.delete(quotaTable)
     quotaManager.clearCache()
     config.reload()
   })

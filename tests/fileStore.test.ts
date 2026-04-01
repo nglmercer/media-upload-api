@@ -1,42 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { fileStore, setFileStorage } from '../src/store/fileStore'
-import { JsonManager, JsonObjManager } from 'json-obj-manager'
-import { FileAdapter } from 'json-obj-manager/node'
+import { fileStore } from '../src/store/fileStore'
+import { db } from '../src/db/db'
+import { files } from '../src/db/schema'
 import path from 'path'
 import fs from 'fs'
 import type { FileItem } from '../src/types/file'
 
 describe('FileStore', () => {
-  let testStorage: JsonObjManager<FileItem>
-  let testStoragePath: string
-
   beforeEach(async () => {
-    // Create a temporary test storage
-    testStoragePath = path.join(process.cwd(), 'data', 'test-fileStore.json')
-    
-    // Ensure data directory exists
-    const dataDir = path.dirname(testStoragePath)
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true })
-    }
-
-    // Clean up any existing test file
-    if (fs.existsSync(testStoragePath)) {
-      fs.unlinkSync(testStoragePath)
-    }
-
-    const adapter = new FileAdapter<FileItem>(testStoragePath)
-    testStorage = new JsonManager<FileItem>({ adapter })
-    
-    // Override the file store storage
-    setFileStorage(testStorage)
+    // Clear files table before each test
+    await db.delete(files)
   })
 
   afterEach(async () => {
-    // Clean up test storage
-    if (testStoragePath && fs.existsSync(testStoragePath)) {
-      fs.unlinkSync(testStoragePath)
-    }
+    // Clear files table after each test
+    await db.delete(files)
   })
 
   describe('getAll', () => {
@@ -47,6 +25,7 @@ describe('FileStore', () => {
 
     it('should return all stored files', async () => {
       const testFile: FileItem = {
+        isPublic: true,
         id: 'file-1',
         name: 'test.png',
         originalName: 'test.png',
@@ -68,11 +47,11 @@ describe('FileStore', () => {
         deletedAt: null,
       }
 
-      await testStorage.save('file-1', testFile)
-      const files = await fileStore.getAll()
+      await fileStore.save('file-1', testFile)
+      const allFiles = await fileStore.getAll()
       
-      expect(Object.keys(files)).toContain('file-1')
-      expect(files['file-1'].name).toBe('test.png')
+      expect(Object.keys(allFiles)).toContain('file-1')
+      expect(allFiles['file-1'].name).toBe('test.png')
     })
   })
 
@@ -84,6 +63,7 @@ describe('FileStore', () => {
 
     it('should return file by id', async () => {
       const testFile: FileItem = {
+        isPublic: true,
         id: 'file-2',
         name: 'test.jpg',
         originalName: 'test.jpg',
@@ -105,7 +85,7 @@ describe('FileStore', () => {
         deletedAt: null,
       }
 
-      await testStorage.save('file-2', testFile)
+      await fileStore.save('file-2', testFile)
       const file = await fileStore.get('file-2')
       
       expect(file).toBeDefined()
@@ -117,6 +97,7 @@ describe('FileStore', () => {
   describe('save', () => {
     it('should save a new file', async () => {
       const testFile: FileItem = {
+        isPublic: true,
         id: 'file-3',
         name: 'test.pdf',
         originalName: 'test.pdf',
@@ -148,6 +129,7 @@ describe('FileStore', () => {
 
     it('should update existing file', async () => {
       const testFile: FileItem = {
+        isPublic: true,
         id: 'file-4',
         name: 'original.txt',
         originalName: 'original.txt',
@@ -184,6 +166,7 @@ describe('FileStore', () => {
   describe('delete', () => {
     it('should delete a file', async () => {
       const testFile: FileItem = {
+        isPublic: true,
         id: 'file-5',
         name: 'delete-me.txt',
         originalName: 'delete-me.txt',
@@ -205,7 +188,7 @@ describe('FileStore', () => {
         deletedAt: null,
       }
 
-      await testStorage.save('file-5', testFile)
+      await fileStore.save('file-5', testFile)
       
       // Verify file exists
       let file = await fileStore.get('file-5')
@@ -228,6 +211,7 @@ describe('FileStore', () => {
 
     it('should find file by URL', async () => {
       const testFile: FileItem = {
+        isPublic: true,
         id: 'file-6',
         name: 'find-me.png',
         originalName: 'find-me.png',
@@ -249,7 +233,7 @@ describe('FileStore', () => {
         deletedAt: null,
       }
 
-      await testStorage.save('file-6', testFile)
+      await fileStore.save('file-6', testFile)
       
       const file = await fileStore.findByUrl('/uploads/images/find-me.png')
       expect(file).toBeDefined()
@@ -258,6 +242,7 @@ describe('FileStore', () => {
 
     it('should return undefined for non-matching URL', async () => {
       const testFile: FileItem = {
+        isPublic: true,
         id: 'file-7',
         name: 'other.png',
         originalName: 'other.png',
@@ -279,7 +264,7 @@ describe('FileStore', () => {
         deletedAt: null,
       }
 
-      await testStorage.save('file-7', testFile)
+      await fileStore.save('file-7', testFile)
       
       const file = await fileStore.findByUrl('/uploads/images/non-existent.png')
       expect(file).toBeUndefined()
@@ -288,12 +273,13 @@ describe('FileStore', () => {
 
   describe('findByCategory', () => {
     it('should return empty array when no files exist', async () => {
-      const files = await fileStore.findByCategory('image')
-      expect(files).toEqual([])
+      const foundFiles = await fileStore.findByCategory('image')
+      expect(foundFiles).toEqual([])
     })
 
     it('should find files by category', async () => {
       const imageFile: FileItem = {
+        isPublic: true,
         id: 'file-8',
         name: 'img.png',
         originalName: 'img.png',
@@ -316,6 +302,7 @@ describe('FileStore', () => {
       }
 
       const docFile: FileItem = {
+        isPublic: true,
         id: 'file-9',
         name: 'doc.pdf',
         originalName: 'doc.pdf',
@@ -337,8 +324,8 @@ describe('FileStore', () => {
         deletedAt: null,
       }
 
-      await testStorage.save('file-8', imageFile)
-      await testStorage.save('file-9', docFile)
+      await fileStore.save('file-8', imageFile)
+      await fileStore.save('file-9', docFile)
       
       const imageFiles = await fileStore.findByCategory('image')
       expect(imageFiles.length).toBe(1)
@@ -352,12 +339,13 @@ describe('FileStore', () => {
 
   describe('findByStatus', () => {
     it('should return empty array when no files exist', async () => {
-      const files = await fileStore.findByStatus('valid')
-      expect(files).toEqual([])
+      const foundFiles = await fileStore.findByStatus('valid')
+      expect(foundFiles).toEqual([])
     })
 
     it('should find files by status', async () => {
       const validFile: FileItem = {
+        isPublic: true,
         id: 'file-10',
         name: 'valid.png',
         originalName: 'valid.png',
@@ -380,6 +368,7 @@ describe('FileStore', () => {
       }
 
       const deletedFile: FileItem = {
+        isPublic: true,
         id: 'file-11',
         name: 'deleted.png',
         originalName: 'deleted.png',
@@ -401,8 +390,8 @@ describe('FileStore', () => {
         deletedAt: Date.now(),
       }
 
-      await testStorage.save('file-10', validFile)
-      await testStorage.save('file-11', deletedFile)
+      await fileStore.save('file-10', validFile)
+      await fileStore.save('file-11', deletedFile)
       
       const validFiles = await fileStore.findByStatus('valid')
       expect(validFiles.length).toBe(1)
