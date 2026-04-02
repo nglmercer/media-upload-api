@@ -185,6 +185,57 @@ export const style = css`
   display: flex;
 }
 
+/* Copy button */
+.copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 2.25rem; /* Next to delete */
+  background: rgba(145, 70, 255, 0.8);
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  padding: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+.copy-btn:hover {
+  background: #a970ff;
+  transform: scale(1.05);
+}
+.copy-btn:active {
+  transform: scale(0.95);
+}
+.item:hover .copy-btn {
+  display: flex;
+}
+
+/* Copy feedback */
+.copy-feedback {
+  position: absolute;
+  top: -1.5rem;
+  right: 0;
+  background: #a970ff;
+  color: white;
+  font-size: 0.6rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  animation: fadeUp 0.6s ease-out forwards;
+}
+
+@keyframes fadeUp {
+  0% { opacity: 0; transform: translateY(5px); }
+  20% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-5px); }
+}
+
 /* Selected check badge */
 .selected-badge {
   position: absolute;

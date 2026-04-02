@@ -12,6 +12,8 @@ export class AuthDashboard extends LitElement {
     @state() private authenticated = !!localStorage.getItem('session_id');
     @state() private activeTab: 'login' | 'signup' = 'login';
     @state() private showLibrary = false;
+    @state() private alertStatus: string | null = null;
+    @state() private alertError: string | null = null;
     private i18n: LocalizeController = new LocalizeController(this);
 
     static styles = css`
@@ -131,6 +133,8 @@ export class AuthDashboard extends LitElement {
                         @media-select=${(e: CustomEvent) => this.handleMediaSelect(e)}
                     ></media-library>
                 ` : ''}
+                ${this.alertStatus ? html`<div style="margin-top: 15px; padding: 10px; border-radius: 8px; background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); text-align: center;">${this.alertStatus}</div>` : ''}
+                ${this.alertError ? html`<div style="margin-top: 15px; padding: 10px; border-radius: 8px; background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); text-align: center;">${this.alertError}</div>` : ''}
             `;
         }
         return html`
@@ -160,8 +164,10 @@ export class AuthDashboard extends LitElement {
 
     private async handleMediaSelect(e: CustomEvent) {
         const { selected: file } = e.detail;
-        console.log('[Dashboard] Selected file for alert:', file);
+        console.log('[Dashboard] Selected file for trigger:', file);
         this.showLibrary = false;
+        this.alertStatus = null;
+        this.alertError = null;
 
         const token = localStorage.getItem('session_id') || '';
         const payload: any = {
@@ -185,9 +191,11 @@ export class AuthDashboard extends LitElement {
             });
             const result = await res.json();
             if (result.success) {
-                console.log('Alert triggered successfully');
+                this.alertStatus = `¡Alerta enviada para ${file.originalName}!`;
+                setTimeout(() => this.alertStatus = null, 3000);
             } else {
-                console.error('Failed to trigger alert:', result.error);
+                this.alertError = `Error: ${result.error || 'Algo salió mal'}`;
+                setTimeout(() => this.alertError = null, 5000);
             }
         } catch (err) {
             console.error('Error triggering alert:', err);

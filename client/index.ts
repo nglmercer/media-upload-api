@@ -72,6 +72,7 @@ export class MediaLibrary extends LitElement {
   private apiClient!: MediaUploadClient;
 
   @state() private playingItemId: string | null = null;
+  @state() private showCopiedRequest = false;
 
   private readonly ITEMS_PER_PAGE = 6;
   private _localize: LocalizeController = new LocalizeController(this);
@@ -319,6 +320,39 @@ export class MediaLibrary extends LitElement {
       composed: true,
     }));
     WidgetEvents.emit(WidgetEventTypes.ML_SELECT_FINAL, { url, name, selected });
+  }
+
+  private handleCopyRequest() {
+    const selected = this.items.find(i => i.id === this.selectedItem);
+    if (!selected) return;
+
+    const url = normalizeMediaUrl(this.apiClient.files.getUrl(selected)) || '';
+    const token = localStorage.getItem('session_id') || '';
+    
+    // Construct the payload as expected by the trigger API
+    const payload: any = {
+      duration: 5000,
+      volume: 1,
+      muted: false
+    };
+    if (selected.category === 'video') payload.video = url;
+    else if (selected.category === 'audio') payload.audio = url;
+    else if (selected.category === 'image') payload.image = url;
+
+    const requestDetails = {
+      url: '/api/alerts/trigger',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token.substring(0, 8)}...` // Masked for safety in UI
+      },
+      body: payload
+    };
+
+    navigator.clipboard.writeText(JSON.stringify(requestDetails, null, 2)).then(() => {
+      this.showCopiedRequest = true;
+      setTimeout(() => this.showCopiedRequest = false, 2000);
+    });
   }
 
   private handleClose() {
@@ -750,6 +784,23 @@ export class MediaLibrary extends LitElement {
               ${this.mode === 'manage' ? (this._localize.t('app.cancel') || 'Close') : this._localize.t('app.cancel')}
             </button>
             ${this.mode === 'picker' ? html`
+              <button
+                class="btn-copy ${this.showCopiedRequest ? 'success' : ''}"
+                ?disabled="${!this.selectedItem}"
+                @click="${this.handleCopyRequest}"
+              >
+                ${this.showCopiedRequest ? html`
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                  </svg>
+                  ${this._localize.t('media.requestCopied')}
+                ` : html`
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                  </svg>
+                  ${this._localize.t('media.copyRequest')}
+                `}
+              </button>
               <button
                 class="btn-add"
                 ?disabled="${!this.selectedItem}"

@@ -12,7 +12,11 @@ import type {
   ProgressCallback 
 } from './types';
 import { ENV } from './core';
-
+// this is utility for node.js only in dev mode is allowed for tests never include on build
+// import { createWriteStream } from 'fs';
+// const { createWriteStream } = await import('fs');
+// import { readFile, stat } from 'fs/promises';
+// const { readFile, stat } = await import('fs/promises');
 export class FileClient {
   constructor(private client: CoreClient) {}
 
@@ -92,7 +96,7 @@ export class FileClient {
       xhr.send(formData);
     });
   }
-
+  /*
   async uploadNode(
     filePath: string,
     options?: UploadOptions
@@ -146,6 +150,7 @@ export class FileClient {
     
     return response.json();
   }
+  */
 
   async list(filters?: ListFilters): Promise<PaginatedResult<FileItem>> {
     const params = new URLSearchParams();
@@ -196,9 +201,8 @@ export class FileClient {
 
     return response.blob();
   }
-
+  /*
   async downloadNode(id: string, outputPath: string, options?: DownloadOptions): Promise<void> {
-    const { createWriteStream } = await import('fs');
     
     const baseUrl = this.client.config.baseUrl;
     const token = this.client.config.token;
@@ -246,7 +250,7 @@ export class FileClient {
     } finally {
       fileStream.end();
     }
-  }
+  }*/
 
   getUrl(file: FileItem): string {
     // Use the URL directly from the server response

@@ -305,6 +305,31 @@ export const mediaLibraryStyles = css`
   }
   .btn-add:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
   .btn-add:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-copy {
+    background: transparent;
+    border: 1px solid rgba(169, 112, 255, 0.4);
+    color: #c084fc;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .btn-copy:hover:not(:disabled) {
+    background: rgba(169, 112, 255, 0.1);
+    border-color: #a970ff;
+    color: white;
+  }
+  .btn-copy:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-copy.success {
+    border-color: #22c55e;
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
+  }
 
   /* ── States ───────────────────────────────────────── */
   .loader {
